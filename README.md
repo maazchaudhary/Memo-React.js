@@ -51,6 +51,30 @@ The admin URL is intentionally not linked from the public website.
 3. After the first Super Admin exists, public signup closes automatically.
 4. Additional Super Admin, Editor, and Viewer accounts can only be created from the Admin Users section by a Super Admin.
 
+## Admin Password Recovery
+
+The login screen includes `Forgot password?` for registered admin emails. Recovery links expire after 30 minutes and can only be used once.
+
+To send recovery email, create a `.env` file from `.env.example` and add your SMTP settings:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+For Gmail, use:
+
+```env
+MEMO_PASSWORD_RESET_BASE_URL=http://127.0.0.1:8000/admin
+MEMO_SMTP_HOST=smtp.gmail.com
+MEMO_SMTP_PORT=587
+MEMO_SMTP_FROM=your-gmail@gmail.com
+MEMO_SMTP_USER=your-gmail@gmail.com
+MEMO_SMTP_PASSWORD=your-google-app-password
+MEMO_SMTP_SSL=false
+```
+
+Gmail requires a Google App Password, not your normal Gmail password. After editing `.env`, restart the FastAPI backend.
+
 ## Data
 
 - SQLite database: `memo.sqlite3`

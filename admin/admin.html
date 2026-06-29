@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="admin.css?v=2">
+  <link rel="stylesheet" href="admin.css?v=4">
 </head>
 <body>
   <main class="admin-auth" id="authView">
@@ -24,6 +24,7 @@
         <input name="email" type="email" placeholder="Admin email" required>
         <input name="password" type="password" placeholder="Password" required>
         <button type="submit">Log in</button>
+        <button class="link-button" type="button" data-auth-mode="forgot">Forgot password?</button>
       </form>
       <form id="signupForm" class="auth-form hidden">
         <input name="name" placeholder="Super Admin name" required minlength="2">
@@ -31,10 +32,23 @@
         <input name="password" type="password" placeholder="Password, 8+ characters" required minlength="8">
         <button type="submit">Create Super Admin</button>
       </form>
+      <form id="forgotPasswordForm" class="auth-form hidden">
+        <p class="auth-help">Enter the registered admin email and we will send a recovery link.</p>
+        <input name="email" type="email" placeholder="Registered admin email" required>
+        <button type="submit">Send recovery email</button>
+        <button class="link-button" type="button" data-auth-mode="login">Back to login</button>
+      </form>
+      <form id="resetPasswordForm" class="auth-form hidden">
+        <p class="auth-help">Choose a new password for this admin account.</p>
+        <input name="password" type="password" placeholder="New password, 8+ characters" required minlength="8">
+        <input name="confirm_password" type="password" placeholder="Confirm new password" required minlength="8">
+        <button type="submit">Update password</button>
+        <button class="link-button" type="button" data-auth-mode="login">Back to login</button>
+      </form>
       <p class="auth-message" id="authMessage" aria-live="polite"></p>
     </section>
   </main>
 
-  <script src="admin.js?v=3"></script>
+  <script src="admin.js?v=5"></script>
 </body>
 </html>

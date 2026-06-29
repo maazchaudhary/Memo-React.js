@@ -3,20 +3,42 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import logging
 import os
 import secrets
 import sqlite3
+import smtplib
+import ssl
 import time
+from email.message import EmailMessage
 from pathlib import Path
 from typing import Annotated, Literal
 
-from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def load_env_file(path: Path) -> None:
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        clean = line.strip()
+        if not clean or clean.startswith("#") or "=" not in clean:
+            continue
+        key, value = clean.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+load_env_file(BASE_DIR / ".env")
+
 BACKEND_DIR = BASE_DIR / "backend"
 PUBLIC_DIR = BASE_DIR / "public"
 ADMIN_DIR = BASE_DIR / "admin"
@@ -25,6 +47,7 @@ DIST_DIR = BASE_DIR / "dist"
 DB_PATH = Path(os.getenv("MEMO_DB_PATH", BASE_DIR / "memo.sqlite3"))
 UPLOAD_DIR = ASSETS_DIR / "uploads"
 SESSION_SECONDS = 60 * 60 * 12
+PASSWORD_RESET_SECONDS = 60 * 30
 PBKDF2_ITERATIONS = 210_000
 PUBLIC_FILES = {
     "index.html",
@@ -41,6 +64,7 @@ SPA_ROUTES = {
 }
 
 app = FastAPI(title="Memo by Miraal Admin API")
+logger = logging.getLogger("memo")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -81,6 +105,15 @@ class AdminCreate(BaseModel):
 class LoginPayload(BaseModel):
     email: EmailStr
     password: str
+
+
+class PasswordResetRequestPayload(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetPayload(BaseModel):
+    token: str = Field(min_length=32, max_length=300)
+    password: str = Field(min_length=8, max_length=128)
 
 
 class ProductPayload(BaseModel):
@@ -199,6 +232,60 @@ def verify_password(password: str, stored: str) -> bool:
         return False
 
 
+def token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def password_reset_url(request: Request, token: str) -> str:
+    configured = os.getenv("MEMO_PASSWORD_RESET_BASE_URL", "").strip()
+    base = configured or str(request.url_for("admin_page"))
+    separator = "&" if "?" in base else "?"
+    return f"{base}{separator}reset_token={token}"
+
+
+def send_password_reset_email(email: str, name: str, reset_url: str) -> bool:
+    sender = os.getenv("MEMO_SMTP_FROM", "").strip()
+    host = os.getenv("MEMO_SMTP_HOST", "").strip()
+    port = int(os.getenv("MEMO_SMTP_PORT", "587"))
+    username = os.getenv("MEMO_SMTP_USER", "").strip()
+    password = os.getenv("MEMO_SMTP_PASSWORD", "")
+    use_ssl = os.getenv("MEMO_SMTP_SSL", "").lower() in {"1", "true", "yes"}
+
+    if not host or not sender:
+        logger.warning("Password reset email was requested, but SMTP is not configured.")
+        return False
+
+    message = EmailMessage()
+    message["Subject"] = "Reset your Memo admin password"
+    message["From"] = sender
+    message["To"] = email
+    message.set_content(
+        "\n".join(
+            [
+                f"Hello {name},",
+                "",
+                "Use this link to reset your Memo admin password. It expires in 30 minutes:",
+                reset_url,
+                "",
+                "If you did not request this, you can ignore this email.",
+            ]
+        )
+    )
+
+    if use_ssl:
+        with smtplib.SMTP_SSL(host, port, context=ssl.create_default_context()) as smtp:
+            if username:
+                smtp.login(username, password)
+            smtp.send_message(message)
+    else:
+        with smtplib.SMTP(host, port) as smtp:
+            smtp.starttls(context=ssl.create_default_context())
+            if username:
+                smtp.login(username, password)
+            smtp.send_message(message)
+    return True
+
+
 def require_permission(permission: str):
     def dependency(authorization: Annotated[str | None, Header()] = None):
         if not authorization or not authorization.startswith("Bearer "):
@@ -248,6 +335,13 @@ def init_db():
               token TEXT PRIMARY KEY,
               admin_id INTEGER NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
               expires_at INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS admin_password_resets (
+              token_hash TEXT PRIMARY KEY,
+              admin_id INTEGER NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
+              expires_at INTEGER NOT NULL,
+              used_at INTEGER,
+              created_at INTEGER NOT NULL
             );
             CREATE TABLE IF NOT EXISTS products (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -404,6 +498,48 @@ def login(payload: LoginPayload):
         conn.execute("DELETE FROM admin_sessions WHERE expires_at <= ?", (int(time.time()),))
         conn.execute("INSERT INTO admin_sessions (token,admin_id,expires_at) VALUES (?,?,?)", (token, admin["id"], expires))
         return {"token": token, "admin": {"id": admin["id"], "name": admin["name"], "email": admin["email"], "role": admin["role"]}, "expires_at": expires}
+
+
+@app.post("/api/admin/password-reset/request")
+def request_password_reset(payload: PasswordResetRequestPayload, request: Request):
+    now = int(time.time())
+    response = {"message": "If that email is registered, a recovery link will arrive shortly."}
+    with db() as conn:
+        conn.execute("DELETE FROM admin_password_resets WHERE expires_at <= ? OR used_at IS NOT NULL", (now,))
+        admin = conn.execute("SELECT * FROM admins WHERE email = ?", (payload.email.lower(),)).fetchone()
+        if admin:
+            token = secrets.token_urlsafe(48)
+            conn.execute(
+                "INSERT INTO admin_password_resets (token_hash,admin_id,expires_at,created_at) VALUES (?,?,?,?)",
+                (token_hash(token), admin["id"], now + PASSWORD_RESET_SECONDS, now),
+            )
+            reset_url = password_reset_url(request, token)
+            try:
+                if not send_password_reset_email(admin["email"], admin["name"], reset_url):
+                    logger.error("Password reset email was not sent because SMTP settings are incomplete.")
+            except Exception:
+                logger.exception("Password reset email failed to send.")
+    return response
+
+
+@app.post("/api/admin/password-reset/confirm")
+def confirm_password_reset(payload: PasswordResetPayload):
+    now = int(time.time())
+    hashed_token = token_hash(payload.token)
+    with db() as conn:
+        reset = conn.execute(
+            """
+            SELECT * FROM admin_password_resets
+            WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?
+            """,
+            (hashed_token, now),
+        ).fetchone()
+        if not reset:
+            raise HTTPException(status_code=400, detail="This recovery link is invalid or has expired.")
+        conn.execute("UPDATE admins SET password_hash = ? WHERE id = ?", (password_hash(payload.password), reset["admin_id"]))
+        conn.execute("UPDATE admin_password_resets SET used_at = ? WHERE token_hash = ?", (now, hashed_token))
+        conn.execute("DELETE FROM admin_sessions WHERE admin_id = ?", (reset["admin_id"],))
+    return {"message": "Password updated. You can log in with the new password now."}
 
 
 @app.get("/api/admin/me")
@@ -674,5 +810,3 @@ def public_file(filename: str):
     if filename in PUBLIC_FILES or filename in SPA_ROUTES:
         return storefront_index()
     raise HTTPException(status_code=404, detail="Not found.")
-
-

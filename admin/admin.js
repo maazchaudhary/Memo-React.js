@@ -10,6 +10,7 @@ const isAuthPage = Boolean(document.querySelector("#authView"));
 const isPanelPage = Boolean(document.querySelector("#adminApp"));
 const authPage = location.protocol === "file:" ? "admin.html" : "/admin";
 const panelPage = location.protocol === "file:" ? "panel.html" : "/admin/panel";
+const resetToken = new URLSearchParams(window.location.search).get("reset_token");
 
 const permissions = {
   super_admin: ["dashboard:view", "products:view", "products:create", "products:update", "products:delete", "inventory:update", "orders:view", "orders:update", "sales:view", "admins:manage"],
@@ -38,6 +39,13 @@ function showNotice(message, ok = false) {
   if (!notice) return;
   notice.textContent = message || "";
   notice.style.color = ok ? "#4f6b52" : "#8b4148";
+}
+
+function setAuthMessage(message, ok = false) {
+  const authMessage = document.querySelector("#authMessage");
+  if (!authMessage) return;
+  authMessage.textContent = message || "";
+  authMessage.style.color = ok ? "#4f6b52" : "#8b4148";
 }
 
 async function request(path, options = {}) {
@@ -70,7 +78,7 @@ async function bootstrap() {
   }
   try {
     currentAdmin = await request("/api/admin/me");
-    if (isAuthPage) return goToPanel();
+    if (isAuthPage && !resetToken) return goToPanel();
     document.querySelector("#adminBadge").textContent = `${currentAdmin.name} · ${currentAdmin.role.replace("_", " ")}`;
     applyRoleUI();
     await refreshAll();
@@ -111,13 +119,13 @@ function renderProducts() {
   const tbody = document.querySelector("#productsTable");
   tbody.innerHTML = products.map((product) => `
     <tr>
-      <td><strong>${product.title}</strong><small>${product.summary}</small></td>
-      <td>${label(product.category)}<small>${product.active ? "Visible" : "Hidden"}</small></td>
+      <td><strong>${escapeHtml(product.title)}</strong><small>${escapeHtml(product.summary)}</small></td>
+      <td>${escapeHtml(label(product.category))}<small>${product.active ? "Visible" : "Hidden"}</small></td>
       <td>${money(product.price)}</td>
-      <td>${product.stock}</td>
+      <td>${Number(product.stock || 0)}</td>
       <td><div class="actions">
-        <button data-edit="${product.id}" ${can("products:update") ? "" : "disabled"}>Edit</button>
-        <button class="danger" data-delete="${product.id}" ${can("products:delete") ? "" : "disabled"}>Delete</button>
+        <button data-edit="${Number(product.id)}" ${can("products:update") ? "" : "disabled"}>Edit</button>
+        <button class="danger" data-delete="${Number(product.id)}" ${can("products:delete") ? "" : "disabled"}>Delete</button>
       </div></td>
     </tr>
   `).join("");
@@ -131,10 +139,10 @@ function renderInventory() {
     const status = product.stock === 0 ? ["Out of stock", "status-out"] : product.stock <= 5 ? ["Low stock", "status-low"] : ["In stock", "status-ok"];
     return `
       <tr>
-        <td><strong>${product.title}</strong><small>${label(product.category)}</small></td>
-        <td>${product.stock}</td>
+        <td><strong>${escapeHtml(product.title)}</strong><small>${escapeHtml(label(product.category))}</small></td>
+        <td>${Number(product.stock || 0)}</td>
         <td class="${status[1]}">${status[0]}</td>
-        <td><div class="actions"><input class="stock-input" type="number" min="0" value="${product.stock}" data-stock-input="${product.id}"><button data-stock="${product.id}" ${can("inventory:update") ? "" : "disabled"}>Save</button></div></td>
+        <td><div class="actions"><input class="stock-input" type="number" min="0" value="${Number(product.stock || 0)}" data-stock-input="${Number(product.id)}"><button data-stock="${Number(product.id)}" ${can("inventory:update") ? "" : "disabled"}>Save</button></div></td>
       </tr>
     `;
   }).join("");
@@ -223,12 +231,12 @@ function renderOrders() {
   const tbody = document.querySelector("#ordersTable");
   tbody.innerHTML = orders.map((order) => `
     <tr>
-      <td>#${order.id}</td>
-      <td><strong>${order.customer_name}</strong><small>${order.phone}<br>${order.email}<br>${order.address}, ${order.city}${order.notes ? `<br>Notes: ${order.notes}` : ""}</small></td>
-      <td>${order.items.map((item) => `${item.title} × ${item.quantity}`).join("<br>")}</td>
+      <td>#${Number(order.id)}</td>
+      <td><strong>${escapeHtml(order.customer_name)}</strong><small>${escapeHtml(order.phone)}<br>${escapeHtml(order.email)}<br>${escapeHtml(order.address)}, ${escapeHtml(order.city)}${order.notes ? `<br>Notes: ${escapeHtml(order.notes)}` : ""}</small></td>
+      <td>${order.items.map((item) => `${escapeHtml(item.title)} × ${Number(item.quantity || 0)}`).join("<br>")}</td>
       <td>${money(order.total)}</td>
-      <td>${order.payment_method}<small>${order.payment_status}</small></td>
-      <td><select class="status-select" data-order-status="${order.id}" ${can("orders:update") ? "" : "disabled"}>
+      <td>${escapeHtml(order.payment_method)}<small>${escapeHtml(order.payment_status)}</small></td>
+      <td><select class="status-select" data-order-status="${Number(order.id)}" ${can("orders:update") ? "" : "disabled"}>
         ${["Pending", "Processing", "Dispatched", "Delivered", "Cancelled"].map((status) => `<option ${status === order.status ? "selected" : ""}>${status}</option>`).join("")}
       </select></td>
       <td>${dateText(order.created_at)}</td>
@@ -258,11 +266,11 @@ function renderStockRequests() {
   const tbody = document.querySelector("#requestsTable");
   tbody.innerHTML = stockRequests.length ? stockRequests.map((item) => `
     <tr>
-      <td>#${item.id}</td>
-      <td><strong>${item.product_title}</strong><small>Product #${item.product_id}</small></td>
-      <td><strong>${item.customer_name}</strong><small>${item.phone}<br>${item.email}</small></td>
-      <td>${item.notes || ""}</td>
-      <td><select class="status-select" data-request-status="${item.id}" ${can("orders:update") ? "" : "disabled"}>
+      <td>#${Number(item.id)}</td>
+      <td><strong>${escapeHtml(item.product_title)}</strong><small>Product #${Number(item.product_id)}</small></td>
+      <td><strong>${escapeHtml(item.customer_name)}</strong><small>${escapeHtml(item.phone)}<br>${escapeHtml(item.email)}</small></td>
+      <td>${escapeHtml(item.notes || "")}</td>
+      <td><select class="status-select" data-request-status="${Number(item.id)}" ${can("orders:update") ? "" : "disabled"}>
         ${["Pending", "Contacted", "Closed"].map((status) => `<option ${status === item.status ? "selected" : ""}>${status}</option>`).join("")}
       </select></td>
       <td>${dateText(item.created_at)}</td>
@@ -292,8 +300,8 @@ function renderSales(sales) {
     ["Cancelled", sales.cancelled_orders],
     ["Low stock", sales.low_stock.length]
   ].map(statCard).join("");
-  document.querySelector("#revenueList").innerHTML = sales.revenue_by_day.length ? sales.revenue_by_day.map((row) => `<p><span>${row.day}</span><strong>${money(row.total)}</strong></p>`).join("") : "<p>No revenue yet.</p>";
-  document.querySelector("#bestList").innerHTML = sales.best_selling.length ? sales.best_selling.map((row) => `<p><span>${row.title}</span><strong>${row.quantity} sold</strong></p>`).join("") : "<p>No sales yet.</p>";
+  document.querySelector("#revenueList").innerHTML = sales.revenue_by_day.length ? sales.revenue_by_day.map((row) => `<p><span>${escapeHtml(row.day)}</span><strong>${money(row.total)}</strong></p>`).join("") : "<p>No revenue yet.</p>";
+  document.querySelector("#bestList").innerHTML = sales.best_selling.length ? sales.best_selling.map((row) => `<p><span>${escapeHtml(row.title)}</span><strong>${Number(row.quantity || 0)} sold</strong></p>`).join("") : "<p>No sales yet.</p>";
 }
 
 function renderDashboard() {
@@ -307,13 +315,13 @@ function renderDashboard() {
     ["Pending orders", pendingOrders]
   ].map(statCard).join("");
   document.querySelector("#recentOrders").innerHTML = orders.slice(0, 8).map((order) => `
-    <tr><td>#${order.id}</td><td>${order.customer_name}</td><td>${money(order.total)}</td><td>${order.status}</td><td>${dateText(order.created_at)}</td></tr>
+    <tr><td>#${Number(order.id)}</td><td>${escapeHtml(order.customer_name)}</td><td>${money(order.total)}</td><td>${escapeHtml(order.status)}</td><td>${dateText(order.created_at)}</td></tr>
   `).join("");
   renderDashboardProductChart();
 }
 
 function statCard([labelText, value]) {
-  return `<article class="stat"><span>${labelText}</span><strong>${value}</strong></article>`;
+  return `<article class="stat"><span>${escapeHtml(labelText)}</span><strong>${escapeHtml(value)}</strong></article>`;
 }
 
 function renderDashboardProductChart() {
@@ -374,11 +382,11 @@ async function loadUsers() {
   const tbody = document.querySelector("#usersTable");
   tbody.innerHTML = users.map((user) => `
     <tr>
-      <td><strong>${user.name}</strong><small>${user.email}</small></td>
-      <td><select class="status-select" data-role="${user.id}">
+      <td><strong>${escapeHtml(user.name)}</strong><small>${escapeHtml(user.email)}</small></td>
+      <td><select class="status-select" data-role="${Number(user.id)}">
         ${["super_admin", "editor", "viewer"].map((role) => `<option value="${role}" ${role === user.role ? "selected" : ""}>${role.replace("_", " ")}</option>`).join("")}
       </select></td>
-      <td><div class="actions"><button data-remove-user="${user.id}" class="danger">Remove</button></div></td>
+      <td><div class="actions"><button data-remove-user="${Number(user.id)}" class="danger">Remove</button></div></td>
     </tr>
   `).join("");
   tbody.querySelectorAll("[data-role]").forEach((select) => select.addEventListener("change", () => changeRole(Number(select.dataset.role), select.value)));
@@ -412,27 +420,42 @@ async function removeUser(id) {
 
 document.querySelectorAll("[data-auth-tab]").forEach((button) => {
   button.addEventListener("click", () => {
-    document.querySelectorAll("[data-auth-tab]").forEach((tab) => tab.classList.toggle("active", tab === button));
-    document.querySelector("#loginForm").classList.toggle("hidden", button.dataset.authTab !== "login");
-    document.querySelector("#signupForm").classList.toggle("hidden", button.dataset.authTab !== "signup");
-    document.querySelector("#authMessage").textContent = "";
+    showAuthMode(button.dataset.authTab);
   });
 });
+
+document.querySelectorAll("[data-auth-mode]").forEach((button) => {
+  button.addEventListener("click", () => showAuthMode(button.dataset.authMode));
+});
+
+function showAuthMode(mode) {
+  const forms = {
+    login: document.querySelector("#loginForm"),
+    signup: document.querySelector("#signupForm"),
+    forgot: document.querySelector("#forgotPasswordForm"),
+    reset: document.querySelector("#resetPasswordForm")
+  };
+  Object.entries(forms).forEach(([key, form]) => form?.classList.toggle("hidden", key !== mode));
+  document.querySelectorAll("[data-auth-tab]").forEach((tab) => tab.classList.toggle("active", tab.dataset.authTab === mode));
+  document.querySelector(".auth-tabs")?.classList.toggle("hidden", mode === "reset");
+  setAuthMessage("");
+}
+
+if (resetToken && isAuthPage) showAuthMode("reset");
 
 const loginForm = document.querySelector("#loginForm");
 if (loginForm) {
   loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const message = document.querySelector("#authMessage");
     const form = event.currentTarget;
-    message.textContent = "Logging in...";
+    setAuthMessage("Logging in...");
     try {
       const result = await request("/api/admin/login", { method: "POST", body: JSON.stringify({ email: form.elements.email.value, password: form.elements.password.value }) });
       token = result.token;
       localStorage.setItem(tokenKey, token);
       goToPanel();
     } catch (error) {
-      message.textContent = error.message;
+      setAuthMessage(error.message);
     }
   });
 }
@@ -442,13 +465,54 @@ if (signupForm) {
   signupForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
-    const message = document.querySelector("#authMessage");
     try {
       const result = await request("/api/admin/signup", { method: "POST", body: JSON.stringify({ name: form.elements.name.value, email: form.elements.email.value, password: form.elements.password.value }) });
-      message.textContent = result.message;
+      setAuthMessage(result.message, true);
       form.reset();
     } catch (error) {
-      message.textContent = error.message;
+      setAuthMessage(error.message);
+    }
+  });
+}
+
+const forgotPasswordForm = document.querySelector("#forgotPasswordForm");
+if (forgotPasswordForm) {
+  forgotPasswordForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    setAuthMessage("Sending recovery email...");
+    try {
+      const result = await request("/api/admin/password-reset/request", { method: "POST", body: JSON.stringify({ email: form.elements.email.value }) });
+      setAuthMessage(result.message, true);
+      form.reset();
+    } catch (error) {
+      setAuthMessage(error.message);
+    }
+  });
+}
+
+const resetPasswordForm = document.querySelector("#resetPasswordForm");
+if (resetPasswordForm) {
+  resetPasswordForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const password = form.elements.password.value;
+    const confirmation = form.elements.confirm_password.value;
+    if (password !== confirmation) {
+      setAuthMessage("Passwords do not match.");
+      return;
+    }
+    setAuthMessage("Updating password...");
+    try {
+      const result = await request("/api/admin/password-reset/confirm", { method: "POST", body: JSON.stringify({ token: resetToken, password }) });
+      localStorage.removeItem(tokenKey);
+      token = null;
+      form.reset();
+      window.history.replaceState({}, "", authPage);
+      showAuthMode("login");
+      setAuthMessage(result.message, true);
+    } catch (error) {
+      setAuthMessage(error.message);
     }
   });
 }

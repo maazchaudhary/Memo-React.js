@@ -1,7 +1,10 @@
 __pycache__/
 *.py[cod]
+.env
+.env.*
+!.env.example
 memo.sqlite3
 test_memo.sqlite3
 node_modules/
 dist/
-
+.agents
