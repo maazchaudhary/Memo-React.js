@@ -2,6 +2,13 @@
 import { useEffect, useState } from "react";
 
 const cartKey = "memo_cart";
+const confirmationKey = "memo_last_order";
+const deliveryFee = 250;
+const paymentOptions = ["Cash on Delivery", "Bank Transfer", "EasyPaisa / JazzCash"];
+const manualPaymentInstructions = {
+  "Bank Transfer": "Transfer the final total to Memo by Miraal bank account and share your reference number. Account details: Memo by Miraal, IBAN PK00 MEMO 0000 0000 0000.",
+  "EasyPaisa / JazzCash": "Send the final total to 0308 8844444, account title Memo by Miraal, and enter your transaction ID before submitting."
+};
 const navItems = [
   ["New Arrivals", "/new-arrivals"],
   ["The Silk Edit", "/the-silk-edit"],
@@ -51,6 +58,10 @@ function readCart() {
   try { return JSON.parse(localStorage.getItem(cartKey)) || []; } catch { return []; }
 }
 
+function readConfirmation() {
+  try { return JSON.parse(sessionStorage.getItem(confirmationKey)) || null; } catch { return null; }
+}
+
 function Icon({ type }) {
   if (type === "search") return <svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>;
   if (type === "account") return <svg viewBox="0 0 24 24"><circle cx="12" cy="7.5" r="3.5"/><path d="M5 21c.5-5 3-7 7-7s6.5 2 7 7"/></svg>;
@@ -68,6 +79,7 @@ export default function App() {
   const [cartOpen, setCartOpen] = useState(false);
   const [cart, setCart] = useState(readCart);
   const [cartMessage, setCartMessage] = useState("");
+  const [orderConfirmation, setOrderConfirmation] = useState(readConfirmation);
   const [stockRequestOpen, setStockRequestOpen] = useState(false);
   const [newsletterMessage, setNewsletterMessage] = useState("");
 
@@ -130,6 +142,17 @@ export default function App() {
     }, 0);
   }
 
+  function updateCartQuantity(id, quantity) {
+    setCart((items) => items.map((item) => {
+      if (item.product_id !== id) return item;
+      return { ...item, quantity: Math.max(1, Math.min(Number(quantity) || 1, item.stock)) };
+    }));
+  }
+
+  function removeCartItem(id) {
+    setCart((items) => items.filter((entry) => entry.product_id !== id));
+  }
+
   function addToCart(product) {
     if (!product) return;
     if (product.stock <= 0) {
@@ -151,17 +174,26 @@ export default function App() {
 
   const cartQuantity = cart.reduce((total, item) => total + item.quantity, 0);
   const isCatalog = Boolean(categoryPages[path]);
+  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const finalTotal = subtotal > 0 ? subtotal + deliveryFee : 0;
+  const cartTotals = { subtotal, deliveryFee: subtotal > 0 ? deliveryFee : 0, finalTotal };
+
+  function renderMain() {
+    if (path === "/cart") return <CartPage cart={cart} totals={cartTotals} navigate={navigate} updateQuantity={updateCartQuantity} removeItem={removeCartItem} openCart={() => setCartOpen(true)} />;
+    if (path === "/checkout") return <CheckoutPage cart={cart} totals={cartTotals} navigate={navigate} setCart={setCart} setOrderConfirmation={setOrderConfirmation} />;
+    if (path === "/order-confirmation") return <ConfirmationPage confirmation={orderConfirmation} navigate={navigate} />;
+    if (isCatalog) return <CatalogPage path={path} products={products} navigate={navigate} openQuickView={(product) => { setQuickView(product); setCartMessage(""); setStockRequestOpen(false); }} />;
+    return <HomePage products={products} navigate={navigate} openQuickView={(product) => { setQuickView(product); setCartMessage(""); setStockRequestOpen(false); }} />;
+  }
 
   return <>
     <Header navigate={navigate} menuOpen={menuOpen} setMenuOpen={setMenuOpen} cartQuantity={cartQuantity} openCart={() => setCartOpen(true)} />
-    {isCatalog
-      ? <CatalogPage path={path} products={products} navigate={navigate} openQuickView={(product) => { setQuickView(product); setCartMessage(""); setStockRequestOpen(false); }} />
-      : <HomePage products={products} navigate={navigate} openQuickView={(product) => { setQuickView(product); setCartMessage(""); setStockRequestOpen(false); }} />}
+    {renderMain()}
     <Newsletter message={newsletterMessage} setMessage={setNewsletterMessage} />
     <Footer navigate={navigate} />
     <a className="whatsapp" href="https://api.whatsapp.com/send?phone=923088844444" aria-label="WhatsApp">{"\u25d4"}</a>
     <QuickViewModal product={quickView} onClose={() => setQuickView(null)} onAdd={addToCart} message={cartMessage} stockRequestOpen={stockRequestOpen} setStockRequestOpen={setStockRequestOpen} />
-    <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} cart={cart} setCart={setCart} />
+    <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} cart={cart} totals={cartTotals} navigate={navigate} updateQuantity={updateCartQuantity} removeItem={removeCartItem} />
   </>;
 }
 
@@ -253,36 +285,154 @@ function QuickViewModal({ product, onClose, onAdd, message, stockRequestOpen, se
   }  return <div className="quick-view-modal open" id="quickViewModal" aria-hidden="false"><div className="quick-view-backdrop" onClick={onClose}></div><section className="quick-view-dialog" role="dialog" aria-modal="true" aria-labelledby="quickViewTitle"><button className="quick-view-close" type="button" aria-label="Close quick view" onClick={onClose}><Icon type="close" /></button><div className="quick-view-image"><img src={assetUrl(product.image_url)} alt={product.title} /></div><div className="quick-view-details"><p className="eyebrow">Memo collection</p><h2 id="quickViewTitle">{product.title}</h2><p className="quick-view-price">{money(product.price)}</p><p className="quick-view-summary">{product.summary}</p><p className="quick-view-description">{product.description}</p><div className="quick-view-notes"><span>Embroidered finish</span><span>Made in Pakistan</span><span>Dry clean only</span></div><button className="add-to-cart" type="button" onClick={() => onAdd(product)}>{product.stock <= 0 ? "Out of stock" : "Add to cart"}</button><p className="cart-message" aria-live="polite">{requestMessage || message}</p>{stockRequestOpen && <form className="stock-request-form" id="stockRequestForm" onSubmit={submitStockRequest}><input name="customer_name" placeholder="Full name" required minLength="2" /><input name="phone" placeholder="Phone" required minLength="5" /><input name="email" type="email" placeholder="Email" required /><textarea name="notes" placeholder="Notes"></textarea><button type="submit">Send request</button></form>}</div></section></div>;
 }
 
-function CartDrawer({ open, onClose, cart, setCart }) {
-  const [checkoutMessage, setCheckoutMessage] = useState("");
-  const [confirmation, setConfirmation] = useState("");
-  const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  function updateQuantity(id, quantity) {
-    setCart((items) => items.map((item) => item.product_id === id ? { ...item, quantity: Math.max(1, Math.min(quantity, item.stock)) } : item));
+function OrderSummary({ cart, totals, compact = false }) {
+  return <section className={`order-summary${compact ? " compact" : ""}`} aria-label="Order summary">
+    <h2>Order summary</h2>
+    <div className="summary-items">
+      {cart.length ? cart.map((item) => <div className="summary-row" key={item.product_id}>
+        <span>{item.title} x {item.quantity}</span>
+        <strong>{money(item.price * item.quantity)}</strong>
+      </div>) : <p className="empty-state">Your bag is empty.</p>}
+    </div>
+    <div className="summary-totals">
+      <p><span>Subtotal</span><strong>{money(totals.subtotal)}</strong></p>
+      <p><span>Delivery fee</span><strong>{money(totals.deliveryFee)}</strong></p>
+      <p className="summary-final"><span>Total</span><strong>{money(totals.finalTotal)}</strong></p>
+    </div>
+  </section>;
+}
+
+function CartItems({ cart, updateQuantity, removeItem }) {
+  return <div className="cart-items">
+    {cart.length ? cart.map((item) => <div className="cart-row" data-id={item.product_id} key={item.product_id}>
+      <img src={assetUrl(item.image_url)} alt={item.title} />
+      <div>
+        <strong>{item.title}</strong>
+        <span>{money(item.price)}</span>
+        <small>{Number(item.stock || 0)} available</small>
+        <label>Qty <input type="number" min="1" max={item.stock} value={item.quantity} onChange={(event) => updateQuantity(item.product_id, event.target.value)} /></label>
+      </div>
+      <button type="button" aria-label={`Remove ${item.title}`} onClick={() => removeItem(item.product_id)}>Remove</button>
+    </div>) : <p className="empty-state">Your bag is empty.</p>}
+  </div>;
+}
+
+function CartDrawer({ open, onClose, cart, totals, navigate, updateQuantity, removeItem }) {
+  function goCheckout() {
+    if (!cart.length) return;
+    onClose();
+    navigate("/checkout");
   }
+
+  return <aside className={`cart-drawer${open ? " open" : ""}`} id="cartDrawer" aria-hidden={!open}>
+    <div className="cart-panel" role="dialog" aria-modal="true" aria-labelledby="cartTitle">
+      <button className="cart-close" type="button" aria-label="Close cart" onClick={onClose}>x</button>
+      <h2 id="cartTitle">Shopping Bag</h2>
+      <CartItems cart={cart} updateQuantity={updateQuantity} removeItem={removeItem} />
+      <OrderSummary cart={cart} totals={totals} compact />
+      <button className="checkout-button" type="button" disabled={!cart.length} onClick={goCheckout}>Checkout</button>
+    </div>
+    <button className="cart-backdrop" type="button" aria-label="Close cart" onClick={onClose}></button>
+  </aside>;
+}
+
+function CartPage({ cart, totals, navigate, updateQuantity, removeItem, openCart }) {
+  return <main className="checkout-page cart-page">
+    <nav className="breadcrumbs" aria-label="Breadcrumb"><Link to="/" navigate={navigate}>Home</Link><span>/</span><span>Cart</span></nav>
+    <section className="checkout-shell">
+      <div className="checkout-card">
+        <p className="eyebrow">Shopping bag</p>
+        <h1>Your Cart</h1>
+        <CartItems cart={cart} updateQuantity={updateQuantity} removeItem={removeItem} />
+        {!cart.length && <button className="checkout-button secondary" type="button" onClick={() => navigate("/new-arrivals")}>Continue shopping</button>}
+      </div>
+      <div>
+        <OrderSummary cart={cart} totals={totals} />
+        <button className="checkout-button" type="button" disabled={!cart.length} onClick={() => cart.length ? navigate("/checkout") : openCart()}>Checkout</button>
+      </div>
+    </section>
+  </main>;
+}
+
+function CheckoutPage({ cart, totals, navigate, setCart, setOrderConfirmation }) {
+  const [paymentMethod, setPaymentMethod] = useState("Cash on Delivery");
+  const [message, setMessage] = useState("");
+  const manualInstructions = manualPaymentInstructions[paymentMethod];
+
   async function submitCheckout(event) {
     event.preventDefault();
-    const formElement = event.currentTarget;
     if (!cart.length) {
-      setCheckoutMessage("Add at least one product to checkout.");
+      setMessage("Your cart is empty. Add at least one product before checkout.");
       return;
     }
+    const formElement = event.currentTarget;
     const payload = Object.fromEntries(new FormData(formElement).entries());
+    payload.payment_method = paymentMethod;
     payload.items = cart.map(({ product_id, quantity }) => ({ product_id, quantity }));
-    setCheckoutMessage("Placing your order...");
+    setMessage("Placing your order...");
     try {
       const response = await fetch("/api/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.detail || "Order could not be placed.");
-      const orderNumber = result.order_number || `MEMO-${String(result.id).padStart(5, "0")}`;
-      formElement.reset();
-      setConfirmation(orderNumber);
+      const confirmation = { ...result, instructions: manualPaymentInstructions[result.payment_method] || "" };
+      sessionStorage.setItem(confirmationKey, JSON.stringify(confirmation));
+      setOrderConfirmation(confirmation);
       setCart([]);
-      setCheckoutMessage("");
+      formElement.reset();
+      setMessage("");
+      navigate("/order-confirmation");
     } catch (error) {
-      setCheckoutMessage(error.message);
+      setMessage(error.message);
     }
-  }  return <aside className={`cart-drawer${open ? " open" : ""}`} id="cartDrawer" aria-hidden={!open}><div className="cart-panel" role="dialog" aria-modal="true" aria-labelledby="cartTitle"><button className="cart-close" type="button" aria-label="Close cart" onClick={onClose}>x</button>{confirmation ? <div className="order-success" id="orderConfirmation" aria-live="polite"><span className="order-success-tick" aria-hidden="true"></span><h2 id="cartTitle">Order placed</h2></div> : <><h2 id="cartTitle">Shopping Bag</h2><div className="cart-items">{cart.length ? cart.map((item) => <div className="cart-row" data-id={item.product_id} key={item.product_id}><img src={assetUrl(item.image_url)} alt={item.title} /><div><strong>{item.title}</strong><span>{money(item.price)}</span><label>Qty <input type="number" min="1" max={item.stock} value={item.quantity} onChange={(event) => updateQuantity(item.product_id, Number(event.target.value))} /></label></div><button type="button" aria-label={`Remove ${item.title}`} onClick={() => setCart((items) => items.filter((entry) => entry.product_id !== item.product_id))}>Remove</button></div>) : <p className="empty-state">Your bag is empty.</p>}{cart.length > 0 && <p className="cart-total">Total <strong>{money(total)}</strong></p>}</div><form className="checkout-form" id="checkoutForm" onSubmit={submitCheckout}><h3>Checkout</h3><input name="customer_name" placeholder="Full name" required minLength="2" /><input name="phone" placeholder="Phone" required minLength="5" /><input name="email" type="email" placeholder="Email" required /><input name="address" placeholder="Address" required minLength="5" /><input name="city" placeholder="City" required minLength="2" /><textarea name="notes" placeholder="Order notes"></textarea><button type="submit">Place order</button><p className="checkout-message" aria-live="polite">{checkoutMessage}</p></form></>}</div><button className="cart-backdrop" type="button" aria-label="Close cart" onClick={onClose}></button></aside>;
+  }
+
+  return <main className="checkout-page">
+    <nav className="breadcrumbs" aria-label="Breadcrumb"><Link to="/" navigate={navigate}>Home</Link><span>/</span><span>Checkout</span></nav>
+    <section className="checkout-shell">
+      <form className="checkout-card checkout-form" onSubmit={submitCheckout}>
+        <p className="eyebrow">Secure checkout</p>
+        <h1>Checkout</h1>
+        <fieldset>
+          <legend>Customer details</legend>
+          <input name="customer_name" placeholder="Customer name" required minLength="2" />
+          <input name="phone" placeholder="Phone number" required minLength="5" />
+          <input name="email" type="email" placeholder="Email" required />
+          <input name="address" placeholder="Full address" required minLength="5" />
+          <input name="city" placeholder="City" required minLength="2" />
+          <textarea name="notes" placeholder="Notes"></textarea>
+        </fieldset>
+        <fieldset>
+          <legend>Payment method</legend>
+          <div className="payment-options">{paymentOptions.map((option) => <label className="payment-option" key={option}>
+            <input type="radio" name="payment_method_choice" checked={paymentMethod === option} onChange={() => setPaymentMethod(option)} />
+            <span>{option}</span>
+          </label>)}</div>
+          {manualInstructions && <div className="payment-instructions"><strong>Payment instructions</strong><p>{manualInstructions}</p></div>}
+          {manualInstructions && <input name="transaction_reference" placeholder="Transaction / reference number (optional)" />}
+        </fieldset>
+        <button type="submit" disabled={!cart.length}>Place order</button>
+        <p className="checkout-message" aria-live="polite">{message}</p>
+      </form>
+      <OrderSummary cart={cart} totals={totals} />
+    </section>
+  </main>;
+}
+
+function ConfirmationPage({ confirmation, navigate }) {
+  return <main className="checkout-page">
+    <section className="confirmation-panel">
+      <span className="order-success-tick" aria-hidden="true"></span>
+      <p className="eyebrow">Order received</p>
+      <h1>Thank you</h1>
+      {confirmation ? <>
+        <p>Your order number is <strong>{confirmation.order_number}</strong>.</p>
+        <p>Total: <strong>{money(confirmation.total)}</strong></p>
+        <p>Payment: <strong>{confirmation.payment_method}</strong> - {confirmation.payment_status}</p>
+        {confirmation.instructions && <div className="payment-instructions"><strong>Payment instructions</strong><p>{confirmation.instructions}</p></div>}
+      </> : <p>Your most recent order details are not available in this browser session.</p>}
+      <button className="checkout-button" type="button" onClick={() => navigate("/new-arrivals")}>Continue shopping</button>
+    </section>
+  </main>;
 }
 
 function Newsletter({ message, setMessage }) {

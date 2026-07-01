@@ -61,7 +61,13 @@ SPA_ROUTES = {
     "the-silk-edit",
     "everyday-memo",
     "occasion-wear",
+    "cart",
+    "checkout",
+    "order-confirmation",
 }
+DELIVERY_FEE = int(os.getenv("MEMO_DELIVERY_FEE", "250"))
+PAYMENT_METHODS = {"Cash on Delivery", "Bank Transfer", "EasyPaisa / JazzCash"}
+MANUAL_PAYMENT_METHODS = {"Bank Transfer", "EasyPaisa / JazzCash"}
 
 app = FastAPI(title="Memo by Miraal Admin API")
 logger = logging.getLogger("memo")
@@ -144,7 +150,8 @@ class CheckoutPayload(BaseModel):
     address: str = Field(min_length=5, max_length=250)
     city: str = Field(min_length=2, max_length=80)
     notes: str | None = Field(default="", max_length=500)
-    payment_method: str = Field(default="Cash on delivery", max_length=80)
+    payment_method: str = Field(default="Cash on Delivery", max_length=80)
+    transaction_reference: str | None = Field(default="", max_length=120)
     items: list[OrderItemPayload] = Field(min_length=1)
 
 
@@ -158,6 +165,10 @@ class StockRequestPayload(BaseModel):
 
 class OrderStatusPayload(BaseModel):
     status: Literal["Pending", "Processing", "Dispatched", "Delivered", "Cancelled"]
+
+
+class PaymentStatusPayload(BaseModel):
+    payment_status: Literal["Pending", "Awaiting Confirmation", "Paid", "Failed", "Refunded"]
 
 
 class StockRequestStatusPayload(BaseModel):
@@ -317,6 +328,12 @@ def product_row(conn: sqlite3.Connection, product_id: int):
     return product
 
 
+def ensure_column(conn: sqlite3.Connection, table: str, column: str, definition: str):
+    columns = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column not in columns:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
 @app.on_event("startup")
 def init_db():
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -366,9 +383,12 @@ def init_db():
               address TEXT NOT NULL,
               city TEXT NOT NULL,
               notes TEXT,
+              subtotal INTEGER NOT NULL DEFAULT 0,
+              delivery_fee INTEGER NOT NULL DEFAULT 0,
               total INTEGER NOT NULL,
               payment_method TEXT NOT NULL,
-              payment_status TEXT NOT NULL DEFAULT 'Unpaid',
+              payment_status TEXT NOT NULL DEFAULT 'Pending',
+              transaction_reference TEXT,
               status TEXT NOT NULL DEFAULT 'Pending',
               created_at INTEGER NOT NULL,
               updated_at INTEGER NOT NULL
@@ -395,6 +415,10 @@ def init_db():
             );
             """
         )
+        ensure_column(conn, "orders", "subtotal", "INTEGER NOT NULL DEFAULT 0")
+        ensure_column(conn, "orders", "delivery_fee", "INTEGER NOT NULL DEFAULT 0")
+        ensure_column(conn, "orders", "transaction_reference", "TEXT")
+        conn.execute("UPDATE orders SET subtotal = total WHERE subtotal = 0")
         if conn.execute("SELECT COUNT(*) FROM products").fetchone()[0] == 0:
             now = int(time.time())
             for item in SEED_PRODUCTS:
@@ -425,36 +449,76 @@ def products(category: str | None = None, featured: bool | None = None):
 
 @app.post("/api/orders")
 def checkout(payload: CheckoutPayload):
+    if payload.payment_method not in PAYMENT_METHODS:
+        raise HTTPException(status_code=400, detail="Choose a valid payment method.")
     now = int(time.time())
     with db() as conn:
-        products_by_id = {}
-        total = 0
+        quantities_by_id: dict[int, int] = {}
         for item in payload.items:
-            product = product_row(conn, item.product_id)
+            quantities_by_id[item.product_id] = quantities_by_id.get(item.product_id, 0) + item.quantity
+
+        subtotal = 0
+        order_items = []
+        for product_id, quantity in quantities_by_id.items():
+            if quantity > 99:
+                raise HTTPException(status_code=400, detail="Quantity cannot be higher than 99 per product.")
+            product = product_row(conn, product_id)
             if not product["active"]:
                 raise HTTPException(status_code=400, detail=f"{product['title']} is not available.")
-            if product["stock"] < item.quantity:
+            if product["stock"] < quantity:
                 raise HTTPException(status_code=400, detail=f"Only {product['stock']} left for {product['title']}.")
-            products_by_id[item.product_id] = product
-            total += product["price"] * item.quantity
+            line_total = product["price"] * quantity
+            subtotal += line_total
+            order_items.append((product, quantity, line_total))
+
+        if subtotal <= 0:
+            raise HTTPException(status_code=400, detail="Add at least one product to checkout.")
+
+        payment_status = "Awaiting Confirmation" if payload.payment_method in MANUAL_PAYMENT_METHODS else "Pending"
+        total = subtotal + DELIVERY_FEE
+        transaction_reference = (payload.transaction_reference or "").strip()
 
         cursor = conn.execute(
             """
-            INSERT INTO orders (customer_name,phone,email,address,city,notes,total,payment_method,status,created_at,updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+            INSERT INTO orders (customer_name,phone,email,address,city,notes,subtotal,delivery_fee,total,payment_method,payment_status,transaction_reference,status,created_at,updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
-            (payload.customer_name.strip(), payload.phone.strip(), payload.email.lower(), payload.address.strip(), payload.city.strip(), (payload.notes or "").strip(), total, payload.payment_method, "Pending", now, now),
+            (
+                payload.customer_name.strip(),
+                payload.phone.strip(),
+                payload.email.lower(),
+                payload.address.strip(),
+                payload.city.strip(),
+                (payload.notes or "").strip(),
+                subtotal,
+                DELIVERY_FEE,
+                total,
+                payload.payment_method,
+                payment_status,
+                transaction_reference,
+                "Pending",
+                now,
+                now,
+            ),
         )
         order_id = cursor.lastrowid
-        for item in payload.items:
-            product = products_by_id[item.product_id]
-            line_total = product["price"] * item.quantity
+        for product, quantity, line_total in order_items:
             conn.execute(
                 "INSERT INTO order_items (order_id,product_id,title,price,quantity,line_total) VALUES (?,?,?,?,?,?)",
-                (order_id, product["id"], product["title"], product["price"], item.quantity, line_total),
+                (order_id, product["id"], product["title"], product["price"], quantity, line_total),
             )
-            conn.execute("UPDATE products SET stock = stock - ?, updated_at = ? WHERE id = ?", (item.quantity, now, product["id"]))
-        return {"id": order_id, "order_number": order_number(order_id), "total": total, "status": "Pending"}
+            conn.execute("UPDATE products SET stock = stock - ?, updated_at = ? WHERE id = ?", (quantity, now, product["id"]))
+        return {
+            "id": order_id,
+            "order_number": order_number(order_id),
+            "subtotal": subtotal,
+            "delivery_fee": DELIVERY_FEE,
+            "total": total,
+            "status": "Pending",
+            "payment_method": payload.payment_method,
+            "payment_status": payment_status,
+            "transaction_reference": transaction_reference,
+        }
 
 
 @app.post("/api/stock-requests")
@@ -509,16 +573,19 @@ def request_password_reset(payload: PasswordResetRequestPayload, request: Reques
         admin = conn.execute("SELECT * FROM admins WHERE email = ?", (payload.email.lower(),)).fetchone()
         if admin:
             token = secrets.token_urlsafe(48)
+            reset_url = password_reset_url(request, token)
             conn.execute(
                 "INSERT INTO admin_password_resets (token_hash,admin_id,expires_at,created_at) VALUES (?,?,?,?)",
                 (token_hash(token), admin["id"], now + PASSWORD_RESET_SECONDS, now),
             )
-            reset_url = password_reset_url(request, token)
             try:
                 if not send_password_reset_email(admin["email"], admin["name"], reset_url):
-                    logger.error("Password reset email was not sent because SMTP settings are incomplete.")
-            except Exception:
+                    raise HTTPException(status_code=500, detail="Recovery email could not be sent because SMTP is not configured.")
+            except HTTPException:
+                raise
+            except Exception as error:
                 logger.exception("Password reset email failed to send.")
+                raise HTTPException(status_code=500, detail=f"Recovery email could not be sent: {error}")
     return response
 
 
@@ -633,6 +700,7 @@ def admin_orders(admin=Depends(require_permission("orders:view"))):
     with db() as conn:
         orders = rows_dict(conn.execute("SELECT * FROM orders ORDER BY created_at DESC").fetchall())
         for order in orders:
+            order["order_number"] = order_number(order["id"])
             order["items"] = rows_dict(conn.execute("SELECT * FROM order_items WHERE order_id = ?", (order["id"],)).fetchall())
         return orders
 
@@ -645,6 +713,16 @@ def update_order_status(order_id: int, payload: OrderStatusPayload, admin=Depend
             raise HTTPException(status_code=404, detail="Order not found.")
         conn.execute("UPDATE orders SET status=?, updated_at=? WHERE id=?", (payload.status, int(time.time()), order_id))
         return {"message": "Order status updated.", "status": payload.status}
+
+
+@app.patch("/api/admin/orders/{order_id}/payment-status")
+def update_payment_status(order_id: int, payload: PaymentStatusPayload, admin=Depends(require_permission("orders:update"))):
+    with db() as conn:
+        order = conn.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found.")
+        conn.execute("UPDATE orders SET payment_status=?, updated_at=? WHERE id=?", (payload.payment_status, int(time.time()), order_id))
+        return {"message": "Payment status updated.", "payment_status": payload.payment_status}
 
 
 @app.get("/api/admin/stock-requests")

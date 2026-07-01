@@ -227,7 +227,7 @@ async function loadOrders() {
   renderOrders();
 }
 
-function renderOrders() {
+function renderOrdersLegacy() {
   const tbody = document.querySelector("#ordersTable");
   tbody.innerHTML = orders.map((order) => `
     <tr>
@@ -251,6 +251,37 @@ async function updateOrderStatus(id, status) {
   await loadSales().catch(() => {});
   renderDashboard();
   showNotice(`Order #${id} marked ${status}.`, true);
+}
+
+function renderOrders() {
+  const tbody = document.querySelector("#ordersTable");
+  tbody.innerHTML = orders.map((order) => `
+    <tr>
+      <td><strong>${escapeHtml(order.order_number || `MEMO-${String(order.id).padStart(5, "0")}`)}</strong><small>#${Number(order.id)}</small></td>
+      <td><strong>${escapeHtml(order.customer_name)}</strong><small>${escapeHtml(order.phone)}<br>${escapeHtml(order.email)}<br>${escapeHtml(order.address)}, ${escapeHtml(order.city)}${order.notes ? `<br>Notes: ${escapeHtml(order.notes)}` : ""}</small></td>
+      <td>${order.items.map((item) => `${escapeHtml(item.title)} x ${Number(item.quantity || 0)}`).join("<br>")}</td>
+      <td>${money(order.total)}<small>Subtotal ${money(order.subtotal || order.total)}<br>Delivery ${money(order.delivery_fee || 0)}</small></td>
+      <td>${escapeHtml(order.payment_method)}</td>
+      <td><select class="status-select" data-payment-status="${Number(order.id)}" ${can("orders:update") ? "" : "disabled"}>
+        ${["Pending", "Awaiting Confirmation", "Paid", "Failed", "Refunded"].map((status) => `<option ${status === order.payment_status ? "selected" : ""}>${status}</option>`).join("")}
+      </select></td>
+      <td>${escapeHtml(order.transaction_reference || "") || "<small>Not provided</small>"}</td>
+      <td><select class="status-select" data-order-status="${Number(order.id)}" ${can("orders:update") ? "" : "disabled"}>
+        ${["Pending", "Processing", "Dispatched", "Delivered", "Cancelled"].map((status) => `<option ${status === order.status ? "selected" : ""}>${status}</option>`).join("")}
+      </select></td>
+      <td>${dateText(order.created_at)}</td>
+    </tr>
+  `).join("");
+  tbody.querySelectorAll("[data-order-status]").forEach((select) => select.addEventListener("change", () => updateOrderStatus(Number(select.dataset.orderStatus), select.value)));
+  tbody.querySelectorAll("[data-payment-status]").forEach((select) => select.addEventListener("change", () => updatePaymentStatus(Number(select.dataset.paymentStatus), select.value)));
+}
+
+async function updatePaymentStatus(id, paymentStatus) {
+  await request(`/api/admin/orders/${id}/payment-status`, { method: "PATCH", body: JSON.stringify({ payment_status: paymentStatus }) });
+  await loadOrders();
+  await loadSales().catch(() => {});
+  renderDashboard();
+  showNotice(`Order #${id} payment marked ${paymentStatus}.`, true);
 }
 
 async function loadStockRequests() {

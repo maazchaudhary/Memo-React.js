@@ -70,7 +70,7 @@ label { display: grid; gap: 6px; color: #555; font-size: 12px; letter-spacing: .
 .check input { width: auto; }
 .form-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-table { width: 100%; border-collapse: collapse; min-width: 720px; }
+table { width: 100%; border-collapse: collapse; min-width: 900px; }
 th, td { padding: 13px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
 th { color: #555; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
 td small { display: block; margin-top: 5px; color: #666; line-height: 1.5; }
