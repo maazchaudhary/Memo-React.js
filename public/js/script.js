@@ -1,13 +1,9 @@
-const API = location.protocol === "file:" ? "http://127.0.0.1:8000" : "";
+const API = location.protocol === "file:" ? "http://127.0.0.1:8001" : "";
 const cartKey = "memo_cart";
 let products = [];
 let cart = readCart();
 
-const pageCategory = {
-  "the-silk-edit.html": "the-silk-edit",
-  "everyday-memo.html": "everyday-memo",
-  "occasion-wear.html": "occasion-wear"
-};
+const pageCategory = {};
 
 function money(amount) {
   return `PKR ${Number(amount || 0).toLocaleString("en-PK")}`;
@@ -77,8 +73,6 @@ function updateCartCount() {
 }
 
 function productCard(product) {
-  const disabled = product.stock <= 0 ? " disabled" : "";
-  const stockText = product.stock <= 0 ? "Out of stock" : "In stock";
   return `
     <article data-product-id="${product.id}" data-price="${money(product.price)}" data-details="${escapeHtml(product.description)}">
       <div class="product-photo">
@@ -90,7 +84,6 @@ function productCard(product) {
       </div>
       <h2>${escapeHtml(product.title)}</h2>
       <p>${escapeHtml(product.summary)}</p>
-      <small class="stock-note${disabled}">${stockText}</small>
     </article>
   `;
 }
@@ -224,8 +217,8 @@ function openQuickView(card) {
   quickViewDescription.textContent = product.description;
   addToCartButton.dataset.productId = product.id;
   addToCartButton.disabled = false;
-  addToCartButton.textContent = product.stock <= 0 ? "Out of stock" : "Add to cart";
-  cartMessage.textContent = "";
+  addToCartButton.textContent = product.stock <= 0 ? "Request availability" : "Add to cart";
+  cartMessage.textContent = product.stock <= 0 ? "Currently out of stock" : "";
   setRequestForm(false);
   setQuickView(true);
 }

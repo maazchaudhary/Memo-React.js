@@ -52,15 +52,11 @@ PBKDF2_ITERATIONS = 210_000
 PUBLIC_FILES = {
     "index.html",
     "new-arrivals.html",
-    "the-silk-edit.html",
-    "everyday-memo.html",
-    "occasion-wear.html",
+    "contact-us.html",
 }
 SPA_ROUTES = {
     "new-arrivals",
-    "the-silk-edit",
-    "everyday-memo",
-    "occasion-wear",
+    "contact-us",
     "cart",
     "checkout",
     "order-confirmation",

@@ -11,9 +11,11 @@ const manualPaymentInstructions = {
 };
 const navItems = [
   ["New Arrivals", "/new-arrivals"],
-  ["The Silk Edit", "/the-silk-edit"],
-  ["Everyday Memo", "/everyday-memo"],
-  ["Occasion Wear", "/occasion-wear"]
+];
+const menuItems = [
+  ["Home", "/"],
+  ["New Arrivals", "/new-arrivals"],
+  ["Contact Us", "/contact-us"],
 ];
 
 const seedProducts = [
@@ -33,9 +35,6 @@ const seedProducts = [
 
 const categoryPages = {
   "/new-arrivals": { title: "New Arrivals", category: null, sortOptions: ["New Arrivals", "Name: A to Z", "Price: Low to High", "Price: High to Low"] },
-  "/the-silk-edit": { title: "The Silk Edit", category: "the-silk-edit", sortOptions: ["New Arrivals", "Name: A to Z", "Price: Low to High"] },
-  "/everyday-memo": { title: "Everyday Memo", category: "everyday-memo", sortOptions: ["New Arrivals", "Name: A to Z", "Price: Low to High"] },
-  "/occasion-wear": { title: "Occasion Wear", category: "occasion-wear", sortOptions: ["New Arrivals", "Name: A to Z", "Price: High to Low"] }
 };
 
 function normalizePath(pathname) {
@@ -91,7 +90,8 @@ export default function App() {
 
   useEffect(() => {
     const title = categoryPages[path]?.title;
-    document.title = title ? `${title} | Memo by Miraal` : "Memo by Miraal";
+    const pageTitle = title || (path === "/contact-us" ? "Contact Us" : "");
+    document.title = pageTitle ? `${pageTitle} | Memo by Miraal` : "Memo by Miraal";
     const onScroll = () => setNavScrolled(window.scrollY > 12);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -182,6 +182,7 @@ export default function App() {
     if (path === "/cart") return <CartPage cart={cart} totals={cartTotals} navigate={navigate} updateQuantity={updateCartQuantity} removeItem={removeCartItem} openCart={() => setCartOpen(true)} />;
     if (path === "/checkout") return <CheckoutPage cart={cart} totals={cartTotals} navigate={navigate} setCart={setCart} setOrderConfirmation={setOrderConfirmation} />;
     if (path === "/order-confirmation") return <ConfirmationPage confirmation={orderConfirmation} navigate={navigate} />;
+    if (path === "/contact-us") return <ContactPage navigate={navigate} />;
     if (isCatalog) return <CatalogPage path={path} products={products} navigate={navigate} openQuickView={(product) => { setQuickView(product); setCartMessage(""); setStockRequestOpen(false); }} />;
     return <HomePage products={products} navigate={navigate} openQuickView={(product) => { setQuickView(product); setCartMessage(""); setStockRequestOpen(false); }} />;
   }
@@ -209,15 +210,12 @@ function Header({ navigate, menuOpen, setMenuOpen, cartQuantity, openCart }) {
       <Link className="logo" to="/" navigate={navigate} aria-label="Memo home"><img src="/assets/memo-logo.png" alt="Memo" /></Link>
       <div className="tools">
         <button className="currency">PKR</button>
-        <button aria-label="Search"><Icon type="search" /></button>
-        <button className="desktop-icon" aria-label="Account"><Icon type="account" /></button>
-        <button className="desktop-icon counter" aria-label="Wishlist"><Icon type="heart" /><sup>(0)</sup></button>
         <button className="counter cart-counter" aria-label="Shopping bag" onClick={openCart}><Icon type="bag" /><sup>({cartQuantity})</sup></button>
       </div>
     </header>
     <div className={`menu-panel${menuOpen ? " open" : ""}`} id="menuPanel" aria-hidden={!menuOpen}>
       <button className="menu-close" id="menuClose" aria-label="Close menu" onClick={() => setMenuOpen(false)}>Close</button>
-      <nav>{navItems.map(([label, itemPath]) => <Link key={itemPath} to={itemPath} navigate={navigate}>{label}</Link>)}<Link to="/#social" navigate={navigate}>@memobymiraal</Link></nav>
+      <nav>{menuItems.map(([label, itemPath]) => <Link key={itemPath} to={itemPath} navigate={navigate}>{label}</Link>)}</nav>
     </div>
     <div className={`menu-backdrop${menuOpen ? " open" : ""}`} id="menuBackdrop" onClick={() => setMenuOpen(false)}></div>
   </>;
@@ -225,12 +223,14 @@ function Header({ navigate, menuOpen, setMenuOpen, cartQuantity, openCart }) {
 function HomePage({ products, navigate, openQuickView }) {
   const featured = products.filter((product) => product.featured).slice(0, 4);
   const homeProducts = featured.length ? featured : seedProducts.slice(0, 4);
+  const findProduct = (title, image) => products.find((product) => product.title === title) || seedProducts.find((product) => product.title === title) || seedProducts.find((product) => product.image_url.includes(image));
+  const storyProduct = findProduct("Sunlit Memo", "img_1355.jpg");
   return <main>
     <Hero navigate={navigate} />
-    <section className="products" id="new"><div className="tabs"><button className="active">New In</button><button>Soft Pastels</button><button>Evening Notes</button><button>Everyday Silks</button></div><div className="product-grid">{homeProducts.map((product) => <ProductCard key={product.id} product={product} openQuickView={openQuickView} showHeart />)}</div></section>
-    <TopPicks />
-    <section className="wedding-feature" id="story"><div className="story-image"><img src="/assets/photos/img_1355.jpg" alt="Woman wearing a pale yellow embroidered kaftan" /></div><div className="story-copy"><p className="eyebrow">The story behind the clothes</p><h2>A little memory,<br />made wearable.</h2><p>Memo by Miraal is a love letter to colour, comfort and the women who make every room feel warmer. Each piece is designed to live beyond an occasion and become part of your own story.</p><a href="#story">Read our story</a></div></section>
-    <section className="occasions">{[["img_8818.jpg", "Kaira embroidered dress", "Kaira"], ["img_5142.jpg", "Lira Pink embroidered dress", "Lira Pink"], ["img_4715.jpg", "Raya embroidered dress", "Raya"], ["img_0445.jpg", "Dusk embroidered dress", "Dusk"]].map(([image, alt, label]) => <a href="#" key={label}><img src={`/assets/photos/${image}`} alt={alt} /><span>{label}</span></a>)}</section>
+    <section className="products" id="new"><h2 className="home-section-heading">Luxury in Every Thread</h2><div className="product-grid">{homeProducts.map((product) => <ProductCard key={product.id} product={product} openQuickView={openQuickView} />)}</div></section>
+    <TopPicks products={products} openQuickView={openQuickView} />
+    <section className="wedding-feature" id="story"><div className="story-image"><img src="/assets/photos/img_1355.jpg" alt="Woman wearing a pale yellow embroidered kaftan" />{storyProduct && <QuickViewIconButton product={storyProduct} openQuickView={openQuickView} className="story-quick-view-button" />}</div><div className="story-copy"><p className="eyebrow">The story behind the clothes</p><h2>A little memory,<br />made wearable.</h2><p>Memo by Miraal is a love letter to colour, comfort and the women who make every room feel warmer. Each piece is designed to live beyond an occasion and become part of your own story.</p><a href="#story">Read our story</a></div></section>
+    <section className="occasions">{[["img_8818.jpg", "Kaira embroidered dress", "Kaira"], ["img_5142.jpg", "Lira Pink embroidered dress", "Lira Pink"], ["img_4715.jpg", "Raya embroidered dress", "Raya"], ["img_0445.jpg", "Dusk embroidered dress", "Dusk"]].map(([image, alt, label]) => <ImageFeatureCard key={label} image={image} alt={alt} label={label} product={findProduct(label, image)} openQuickView={openQuickView} />)}</section>
     <section className="social" id="social"><p className="eyebrow">Seen and loved</p><h2>@memobymiraal</h2><div>{["img_9828.jpg", "img_4089.jpg", "img_7990.jpg", "img_0445.jpg", "img_1355.jpg"].map((image) => <img key={image} src={`/assets/photos/${image}`} alt="Memo by Miraal look" />)}</div></section>
   </main>;
 }
@@ -251,7 +251,15 @@ function Hero({ navigate }) {
 
 function ProductCard({ product, openQuickView, showHeart = false }) {
   const [liked, setLiked] = useState(false);
-  return <article data-product-id={product.id} data-price={money(product.price)} data-details={product.description}><div className="product-photo"><img src={assetUrl(product.image_url)} alt={product.title} /><div className="card-tools"><button className="quick-view" type="button" aria-label="Quick view" onClick={() => openQuickView(product)}><Icon type="eye" /></button>{showHeart && <button className="heart" type="button" aria-label={liked ? "Remove from wishlist" : "Add to wishlist"} aria-pressed={liked} onClick={() => setLiked(!liked)}><Icon type="heart" /></button>}</div></div><h2>{product.title}</h2><p>{product.summary}</p>{product.stock <= 0 && <small className="stock-note disabled">Out of stock</small>}</article>;
+  return <article data-product-id={product.id} data-price={money(product.price)} data-details={product.description}><div className="product-photo"><img src={assetUrl(product.image_url)} alt={product.title} /><div className="card-tools"><button className="quick-view" type="button" aria-label="Quick view" onClick={() => openQuickView(product)}><Icon type="eye" /></button>{showHeart && <button className="heart" type="button" aria-label={liked ? "Remove from wishlist" : "Add to wishlist"} aria-pressed={liked} onClick={() => setLiked(!liked)}><Icon type="heart" /></button>}</div></div><h2>{product.title}</h2><p>{product.summary}</p></article>;
+}
+
+function QuickViewIconButton({ product, openQuickView, className = "" }) {
+  return <button className={`feature-quick-view${className ? ` ${className}` : ""}`} type="button" aria-label={`Quick view ${product.title}`} onClick={(event) => { event.preventDefault(); event.stopPropagation(); openQuickView(product); }}><Icon type="eye" /></button>;
+}
+
+function ImageFeatureCard({ image, alt, label, small, product, openQuickView }) {
+  return <a href="#" className="image-feature-card" onClick={(event) => event.preventDefault()}><img src={`/assets/photos/${image}`} alt={alt} /><span>{small && <small>{small}</small>}{label}</span>{product && <QuickViewIconButton product={product} openQuickView={openQuickView} />}</a>;
 }
 
 function CatalogPage({ path, products, navigate, openQuickView }) {
@@ -261,8 +269,9 @@ function CatalogPage({ path, products, navigate, openQuickView }) {
   return <main className="catalog-page"><nav className="breadcrumbs" aria-label="Breadcrumb"><Link to="/" navigate={navigate}>Home</Link><span>/</span><span>{page.title}</span></nav><div className="catalog-shell"><section className="products" aria-label={page.title}><div className="collection-header"><p className="eyebrow">Memo collection</p><h1>{page.title}</h1></div><div className="catalog-toolbar"><div className="view-tools"><label><span>Sort by</span><select>{page.sortOptions.map((option) => <option key={option}>{option}</option>)}</select></label></div></div><div className="tabs">{navItems.map(([label, itemPath]) => <Link key={itemPath} to={itemPath} navigate={navigate} className={itemPath === path ? "active" : ""}>{label}</Link>)}</div><div className="product-grid">{visible.map((product) => <ProductCard key={product.id} product={product} openQuickView={openQuickView} />)}</div>{path === "/new-arrivals" && <nav className="pagination" aria-label="Pagination"><a className="active" href="#">1</a><a href="#">2</a><a href="#">Next</a></nav>}</section></div></main>;
 }
 
-function TopPicks() {
-  return <section className="top-picks" id="top-picks"><p className="eyebrow">A wardrobe in bloom</p><h2>Notes for the Season</h2><div className="pick-grid">{[["img_7990.jpg", "Lira green evening outfit", "Evening notes", "Lira Greens"], ["img_9820.jpg", "Amaya embroidered outfit", "Quiet colour", "Amaya"], ["img_1524.jpg", "Bloom silk dress", "Easy elegance", "Bloom"]].map(([image, alt, small, label]) => <a href="#" key={label}><img src={`/assets/photos/${image}`} alt={alt} /><span><small>{small}</small>{label}</span></a>)}</div></section>;
+function TopPicks({ products, openQuickView }) {
+  const findProduct = (title, image) => products.find((product) => product.title === title) || seedProducts.find((product) => product.title === title) || seedProducts.find((product) => product.image_url.includes(image));
+  return <section className="top-picks" id="top-picks"><p className="eyebrow">A wardrobe in bloom</p><h2>Notes for the Season</h2><div className="pick-grid">{[["img_7990.jpg", "Lira green evening outfit", "Evening notes", "Lira Greens"], ["img_9820.jpg", "Amaya embroidered outfit", "Quiet colour", "Amaya"], ["img_1524.jpg", "Bloom silk dress", "Easy elegance", "Bloom"]].map(([image, alt, small, label]) => <ImageFeatureCard key={label} image={image} alt={alt} small={small} label={label} product={findProduct(label, image)} openQuickView={openQuickView} />)}</div></section>;
 }
 function QuickViewModal({ product, onClose, onAdd, message, stockRequestOpen, setStockRequestOpen }) {
   const [requestMessage, setRequestMessage] = useState("");
@@ -282,7 +291,7 @@ function QuickViewModal({ product, onClose, onAdd, message, stockRequestOpen, se
     } catch (error) {
       setRequestMessage(error.message);
     }
-  }  return <div className="quick-view-modal open" id="quickViewModal" aria-hidden="false"><div className="quick-view-backdrop" onClick={onClose}></div><section className="quick-view-dialog" role="dialog" aria-modal="true" aria-labelledby="quickViewTitle"><button className="quick-view-close" type="button" aria-label="Close quick view" onClick={onClose}><Icon type="close" /></button><div className="quick-view-image"><img src={assetUrl(product.image_url)} alt={product.title} /></div><div className="quick-view-details"><p className="eyebrow">Memo collection</p><h2 id="quickViewTitle">{product.title}</h2><p className="quick-view-price">{money(product.price)}</p><p className="quick-view-summary">{product.summary}</p><p className="quick-view-description">{product.description}</p><div className="quick-view-notes"><span>Embroidered finish</span><span>Made in Pakistan</span><span>Dry clean only</span></div><button className="add-to-cart" type="button" onClick={() => onAdd(product)}>{product.stock <= 0 ? "Out of stock" : "Add to cart"}</button><p className="cart-message" aria-live="polite">{requestMessage || message}</p>{stockRequestOpen && <form className="stock-request-form" id="stockRequestForm" onSubmit={submitStockRequest}><input name="customer_name" placeholder="Full name" required minLength="2" /><input name="phone" placeholder="Phone" required minLength="5" /><input name="email" type="email" placeholder="Email" required /><textarea name="notes" placeholder="Notes"></textarea><button type="submit">Send request</button></form>}</div></section></div>;
+  }  return <div className="quick-view-modal open" id="quickViewModal" aria-hidden="false"><div className="quick-view-backdrop" onClick={onClose}></div><section className="quick-view-dialog" role="dialog" aria-modal="true" aria-labelledby="quickViewTitle"><button className="quick-view-close" type="button" aria-label="Close quick view" onClick={onClose}><Icon type="close" /></button><div className="quick-view-image"><img src={assetUrl(product.image_url)} alt={product.title} /></div><div className="quick-view-details"><p className="eyebrow">Memo collection</p><h2 id="quickViewTitle">{product.title}</h2><p className="quick-view-price">{money(product.price)}</p><p className="quick-view-summary">{product.summary}</p><p className="quick-view-description">{product.description}</p><div className="quick-view-notes"><span>Embroidered finish</span><span>Made in Pakistan</span><span>Dry clean only</span></div>{product.stock <= 0 && <small className="stock-note disabled">Currently out of stock</small>}<button className="add-to-cart" type="button" onClick={() => onAdd(product)}>{product.stock <= 0 ? "Request availability" : "Add to cart"}</button><p className="cart-message" aria-live="polite">{requestMessage || message}</p>{stockRequestOpen && <form className="stock-request-form" id="stockRequestForm" onSubmit={submitStockRequest}><input name="customer_name" placeholder="Full name" required minLength="2" /><input name="phone" placeholder="Phone" required minLength="5" /><input name="email" type="email" placeholder="Email" required /><textarea name="notes" placeholder="Notes"></textarea><button type="submit">Send request</button></form>}</div></section></div>;
 }
 
 function OrderSummary({ cart, totals, compact = false }) {
@@ -435,10 +444,44 @@ function ConfirmationPage({ confirmation, navigate }) {
   </main>;
 }
 
+function ContactPage({ navigate }) {
+  const [message, setMessage] = useState("");
+
+  function submitContact(event) {
+    event.preventDefault();
+    setMessage("Thank you. We will get back to you shortly.");
+    event.currentTarget.reset();
+  }
+
+  return <main className="contact-page">
+    <nav className="breadcrumbs" aria-label="Breadcrumb"><Link to="/" navigate={navigate}>Home</Link><span>/</span><span>Contact Us</span></nav>
+    <section className="contact-shell">
+      <div className="contact-copy">
+        <p className="eyebrow">Memo care</p>
+        <h1>Contact Us</h1>
+        <p>Questions about a piece, sizing, availability, or an order? Leave us a note and the studio will reach out.</p>
+        <div className="contact-details">
+          <span>WhatsApp: +92 308 8844444</span>
+          <span>Email: hello@memobymiraal.com</span>
+        </div>
+      </div>
+      <form className="contact-form" onSubmit={submitContact}>
+        <label><span>Name</span><input name="name" autoComplete="name" required minLength="2" /></label>
+        <label><span>Email</span><input name="email" type="email" autoComplete="email" required /></label>
+        <label><span>Phone Number</span><input name="phone" type="tel" autoComplete="tel" required minLength="5" /></label>
+        <label><span>Comment</span><textarea name="comment" required minLength="4"></textarea></label>
+        <button type="submit">Send Message</button>
+        <p className="contact-message" aria-live="polite">{message}</p>
+      </form>
+    </section>
+  </main>;
+}
+
 function Newsletter({ message, setMessage }) {
   return <section className="newsletter" id="newsletter"><p className="eyebrow">Keep a little Memo</p><h2>Letters from Miraal</h2><p>New pieces, thoughtful stories and first access, sent gently to your inbox.</p><form id="newsletterForm" onSubmit={(event) => { event.preventDefault(); setMessage("Thank you for subscribing."); event.currentTarget.reset(); }}><label className="sr-only" htmlFor="email">Email address</label><input id="email" type="email" placeholder="Enter your email here..." required /><button>Subscribe</button></form><small id="formMessage" aria-live="polite">{message}</small></section>;
 }
 
 function Footer({ navigate }) {
-  return <footer><div><h3>Memo by Miraal</h3><Link to="/#story" navigate={navigate}>Our Story</Link><a href="#">The Journal</a><a href="#">Contact Us</a></div><div><h3>Customer Care</h3><a href="#">FAQ's</a><a href="#">Returns & Exchanges</a><a href="#">Privacy Policy</a></div><div><h3>Online Information</h3><a href="#">My Account</a><a href="#">Order History</a><a href="#">Terms & Conditions</a></div><p>{"\u00a9"} 2026 MEMO BY MIRAAL {"\u00b7"} @MEMOBYMIRAAL</p></footer>;
+  return <footer><div><h3>Memo by Miraal</h3><Link to="/#Payment" navigate={navigate}>Payment</Link><a href="#">Disclaimer</a><Link to="/contact-us" navigate={navigate}>Contact Us</Link></div><div><h3>Orders</h3><a href="#">FAQ's</a><a href="#">Terms and conditions</a><a href="#">Care instructions</a><a href="#">RETURNS & EXCHANGES</a></div><p>{"\u00a9"} 2026 MEMO BY MIRAAL {"\u00b7"} @MEMOBYMIRAAL</p></footer>;
 }
+
