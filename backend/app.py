@@ -50,10 +50,16 @@ PASSWORD_RESET_SECONDS = 60 * 30
 PBKDF2_ITERATIONS = 210_000
 SPA_ROUTES = {
     "new-arrivals",
-    "contact-us",
     "cart",
     "checkout",
     "order-confirmation",
+    "contact-us",
+    "payment",
+    "disclaimer",
+    "faqs",
+    "terms-and-conditions",
+    "care-instructions",
+    "returns-and-exchanges",
 }
 DELIVERY_FEE = int(os.getenv("MEMO_DELIVERY_FEE", "250"))
 PAYMENT_METHODS = {"Cash on Delivery", "Bank Transfer", "EasyPaisa / JazzCash"}
@@ -77,19 +83,20 @@ ROLE_PERMISSIONS = {
 }
 
 SEED_PRODUCTS = [
-    ("Dove Purple", "Silk shirt with embroidered details", "A graceful silk ensemble finished with delicate embroidery and an easy, flowing silhouette.", 18500, "the-silk-edit", 14, "assets/photos/img_7289.jpg", 1),
-    ("Celine", "Pastel embroidered long shirt", "A fresh pastel shirt with intricate embroidery, designed for effortless day-to-evening dressing.", 16900, "everyday-memo", 19, "assets/photos/img_9828.jpg", 1),
-    ("Rose Garden", "Embroidered occasion ensemble", "A refined occasion ensemble featuring floral embroidery and a softly structured drape.", 21500, "occasion-wear", 8, "assets/photos/img_4089.jpg", 1),
-    ("Willow", "Botanical sage silk dress", "A botanical sage silk dress with tonal detailing and a relaxed, elegant finish.", 19800, "the-silk-edit", 11, "assets/photos/img_4140.jpg", 1),
-    ("Bloom", "Easy elegance silk dress", "A soft floral silk dress with delicate movement and refined everyday polish.", 20500, "the-silk-edit", 7, "assets/photos/img_1524.jpg", 0),
-    ("Sunlit Memo", "Embroidered silk kaftan", "A pale yellow kaftan with luminous embroidery and an airy, occasion-ready cut.", 23900, "the-silk-edit", 5, "assets/photos/img_1355.jpg", 0),
-    ("Amaya", "Quiet colour embroidered set", "A quiet pastel outfit made for warm days, garden lunches, and relaxed celebrations.", 17500, "everyday-memo", 16, "assets/photos/img_9820.jpg", 0),
-    ("Kaira", "Fresh embroidered dress", "A polished daywear dress with fresh embroidery and a gently structured shape.", 18900, "everyday-memo", 9, "assets/photos/img_8818.jpg", 0),
-    ("Dusk", "Soft festive dress", "A dusk-pink look balancing softness, festive detail, and everyday ease.", 21900, "everyday-memo", 4, "assets/photos/img_0445.jpg", 0),
-    ("Lira Greens", "Embroidered evening notes", "An evening green ensemble with polished embroidery and a graceful drape.", 22500, "occasion-wear", 6, "assets/photos/img_7990.jpg", 0),
-    ("Lira Pink", "Occasion embroidered dress", "A pink embroidered look with a celebratory silhouette and intricate detailing.", 24500, "occasion-wear", 3, "assets/photos/img_5142.jpg", 0),
-    ("Raya", "Formal embroidered ensemble", "A formal Raya ensemble made with detailed embroidery and a graceful festive profile.", 27500, "occasion-wear", 2, "assets/photos/img_4715.jpg", 0),
-]
+    ("Dove Purple", "Silk shirt with embroidered details", "A graceful silk ensemble finished with delicate embroidery and an easy, flowing silhouette.", 25000, "the-silk-edit", 14, "assets/photos/img_7289.jpg", 1),
+    ("Celine", "Pastel embroidered long shirt", "A fresh pastel shirt with intricate embroidery, designed for effortless day-to-evening dressing.", 16000, "everyday-memo", 19, "assets/photos/img_9828.jpg", 1),
+    ("Rose Garden", "Embroidered occasion ensemble", "A refined occasion ensemble featuring floral embroidery and a softly structured drape.", 16000, "occasion-wear", 8, "assets/photos/img_4089.jpg", 1),
+    ("Passu", "Botanical sage silk dress", "A botanical sage silk dress with tonal detailing and a relaxed, elegant finish.", 16000, "the-silk-edit", 11, "assets/photos/img_4140.jpg", 1),
+    ("Bloom", "Easy elegance silk dress", "A soft floral silk dress with delicate movement and refined everyday polish.", 16000, "the-silk-edit", 7, "assets/photos/img_1524.jpg", 0),
+    ("Sapphire", "Embroidered silk kaftan", "A pale yellow kaftan with luminous embroidery and an airy, occasion-ready cut.", 23000, "the-silk-edit", 5, "assets/photos/img_1355.jpg", 0),
+    ("Amaya", "Quiet colour embroidered set", "A quiet pastel outfit made for warm days, garden lunches, and relaxed celebrations.", 16000, "everyday-memo", 16, "assets/photos/img_9820.jpg", 0),
+    ("Kaira", "Fresh embroidered dress", "A polished daywear dress with fresh embroidery and a gently structured shape.", 16000, "everyday-memo", 9, "assets/photos/img_8818.jpg", 0),
+    ("Dusk", "Soft festive dress", "A dusk-pink look balancing softness, festive detail, and everyday ease.", 16000, "everyday-memo", 4, "assets/photos/img_0445.jpg", 0),
+    ("Lira Greens", "Embroidered evening notes", "An evening green ensemble with polished embroidery and a graceful drape.", 16000, "occasion-wear", 6, "assets/photos/img_7990.jpg", 0),
+    ("Lira Pink", "Occasion embroidered dress", "A pink embroidered look with a celebratory silhouette and intricate detailing.", 16000, "occasion-wear", 3, "assets/photos/img_5142.jpg", 0),
+    ("Raya", "Formal embroidered ensemble", "A formal Raya ensemble made with detailed embroidery and a graceful festive profile.", 16000, "occasion-wear", 2, "assets/photos/img_4715.jpg", 0),
+    
+    ]
 
 
 class AdminCreate(BaseModel):
