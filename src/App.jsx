@@ -453,7 +453,7 @@ function ProductDetailPage({ product, products, currency, navigate, onAdd, messa
   const gallery = productGallery(product);
   const activeImageIndex = gallery[imageIndex] ? imageIndex : 0;
   const latestArrivals = products.filter((item) => item.id !== product?.id).slice(0, 4);
-  const mostSaleItems = products
+  const CustomerFavorites = products
     .filter((item) => item.id !== product?.id && Number(item.stock) > 0)
     .sort((a, b) => Number(a.stock || 0) - Number(b.stock || 0))
     .slice(0, 4);
@@ -517,8 +517,8 @@ function ProductDetailPage({ product, products, currency, navigate, onAdd, messa
       <p className="eyebrow">You may also like</p>
       <h2>Latest arrivals</h2>
       <div className="recommendation-grid">{(latestArrivals.length ? latestArrivals : seedProducts.filter((item) => item.id !== product.id).slice(0, 4)).map((item) => <ProductCard key={`latest-${item.id}`} product={item} currency={currency} navigate={navigate} />)}</div>
-      <h2>Most sale items</h2>
-      <div className="recommendation-grid">{(mostSaleItems.length ? mostSaleItems : seedProducts.filter((item) => item.id !== product.id).slice(4, 8)).map((item) => <ProductCard key={`sale-${item.id}`} product={item} currency={currency} navigate={navigate} />)}</div>
+      <h2>Customer Favorites</h2>
+      <div className="recommendation-grid">{(CustomerFavorites.length ? CustomerFavorites : seedProducts.filter((item) => item.id !== product.id).slice(4, 8)).map((item) => <ProductCard key={`sale-${item.id}`} product={item} currency={currency} navigate={navigate} />)}</div>
     </section>
   </main>;
 }
