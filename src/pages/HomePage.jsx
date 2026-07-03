@@ -1,0 +1,100 @@
+import { seedProducts } from "../data/products";
+import ProductCard from "../components/ProductCard";
+import ImageFeatureCard from "../components/ImageFeatureCard";
+import Hero from "./Hero";
+
+export default function HomePage({ products, currency, navigate }) {
+  const featured = products.filter((product) => product.featured).slice(0, 4);
+  const homeProducts = featured.length ? featured : seedProducts.slice(0, 4);
+
+  const findProduct = (title, image) =>
+    products.find((product) => product.title === title) ||
+    seedProducts.find((product) => product.title === title) ||
+    seedProducts.find((product) => product.image_url.includes(image));
+
+  const storyProduct = findProduct("Sunlit Memo", "img_1355.jpg");
+
+  return (
+    <main>
+      <Hero navigate={navigate} />
+
+      <section className="products" id="new">
+        <h2 className="home-section-heading">Luxury in Every Thread</h2>
+        <div className="product-grid">
+          {homeProducts.map((product) => (
+            <ProductCard key={product.id} product={product} currency={currency} navigate={navigate} />
+          ))}
+        </div>
+      </section>
+
+      <TopPicks products={products} navigate={navigate} />
+
+      <section className="wedding-feature" id="story">
+        <div
+          className="story-image story-image-clickable"
+          onClick={() => storyProduct && navigate(`/products/${storyProduct.slug || "sapphire"}`)}
+          role={storyProduct ? "link" : undefined}
+          tabIndex={storyProduct ? 0 : undefined}
+          onKeyDown={(event) => {
+            if (storyProduct && (event.key === "Enter" || event.key === " ")) {
+              navigate(`/products/${storyProduct.slug || "sapphire"}`);
+            }
+          }}
+        >
+          <img src="/assets/photos/img_1355.jpg" alt="Woman wearing a pale yellow embroidered kaftan" />
+        </div>
+
+        <div className="story-copy">
+          <p className="eyebrow">The story behind the clothes</p>
+          <h2>A little memory,<br />made wearable.</h2>
+          <p>Memo by Miraal is a love letter to colour, comfort and the women who make every room feel warmer. Each piece is designed to live beyond an occasion and become part of your own story.</p>
+          <a href="#story">Read our story</a>
+        </div>
+      </section>
+
+      <section className="occasions">
+        {[
+          ["img_8818.jpg", "Kaira embroidered dress", "Kaira"],
+          ["img_5142.jpg", "Lira Pink embroidered dress", "Lira Pink"],
+          ["img_4715.jpg", "Raya embroidered dress", "Raya"],
+          ["img_0445.jpg", "Dusk embroidered dress", "Dusk"]
+        ].map(([image, alt, label]) => (
+          <ImageFeatureCard key={label} image={image} alt={alt} label={label} product={findProduct(label, image)} navigate={navigate} />
+        ))}
+      </section>
+
+      <section className="social" id="social">
+        <p className="eyebrow">Seen and loved</p>
+        <h2>@memobymiraal</h2>
+        <div>
+          {["img_9828.jpg", "img_4089.jpg", "img_7990.jpg", "img_0445.jpg", "img_1355.jpg"].map((image) => (
+            <img key={image} src={`/assets/photos/${image}`} alt="Memo by Miraal look" />
+          ))}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function TopPicks({ products, navigate }) {
+  const findProduct = (title, image) =>
+    products.find((product) => product.title === title) ||
+    seedProducts.find((product) => product.title === title) ||
+    seedProducts.find((product) => product.image_url.includes(image));
+
+  return (
+    <section className="top-picks" id="top-picks">
+      <p className="eyebrow">A wardrobe in bloom</p>
+      <h2>Notes for the Season</h2>
+      <div className="pick-grid">
+        {[
+          ["img_7990.jpg", "Lira green evening outfit", "Evening notes", "Lira Greens"],
+          ["img_9820.jpg", "Amaya embroidered outfit", "Quiet colour", "Amaya"],
+          ["img_1524.jpg", "Bloom silk dress", "Easy elegance", "Bloom"]
+        ].map(([image, alt, small, label]) => (
+          <ImageFeatureCard key={label} image={image} alt={alt} small={small} label={label} product={findProduct(label, image)} navigate={navigate} />
+        ))}
+      </div>
+    </section>
+  );
+}
