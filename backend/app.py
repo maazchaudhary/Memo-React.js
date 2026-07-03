@@ -14,7 +14,7 @@ from email.message import EmailMessage
 from pathlib import Path
 from typing import Annotated, Literal
 
-from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -40,7 +40,6 @@ def load_env_file(path: Path) -> None:
 load_env_file(BASE_DIR / ".env")
 
 BACKEND_DIR = BASE_DIR / "backend"
-PUBLIC_DIR = BASE_DIR / "public"
 ADMIN_DIR = BASE_DIR / "admin"
 ASSETS_DIR = BASE_DIR / "assets"
 DIST_DIR = BASE_DIR / "dist"
@@ -49,11 +48,6 @@ UPLOAD_DIR = ASSETS_DIR / "uploads"
 SESSION_SECONDS = 60 * 60 * 12
 PASSWORD_RESET_SECONDS = 60 * 30
 PBKDF2_ITERATIONS = 210_000
-PUBLIC_FILES = {
-    "index.html",
-    "new-arrivals.html",
-    "contact-us.html",
-}
 SPA_ROUTES = {
     "new-arrivals",
     "contact-us",
@@ -64,6 +58,7 @@ SPA_ROUTES = {
 DELIVERY_FEE = int(os.getenv("MEMO_DELIVERY_FEE", "250"))
 PAYMENT_METHODS = {"Cash on Delivery", "Bank Transfer", "EasyPaisa / JazzCash"}
 MANUAL_PAYMENT_METHODS = {"Bank Transfer", "EasyPaisa / JazzCash"}
+SIZE_OPTIONS = {"Extra Small", "Small", "Medium", "Large", "Custom"}
 
 app = FastAPI(title="Memo by Miraal Admin API")
 logger = logging.getLogger("memo")
@@ -137,6 +132,7 @@ class StockPayload(BaseModel):
 class OrderItemPayload(BaseModel):
     product_id: int
     quantity: int = Field(ge=1, le=99)
+    size: str = Field(default="Medium", min_length=2, max_length=40)
 
 
 class CheckoutPayload(BaseModel):
@@ -204,15 +200,42 @@ def storage_image_url(value: str | None):
     return public_asset_url((value or "").strip()) or "/assets/photos/img_9828.jpg"
 
 
-def serialize_product(row: sqlite3.Row | None):
+def product_images(conn: sqlite3.Connection, product_id: int, fallback: str | None = None):
+    rows = conn.execute(
+        "SELECT image_url FROM product_images WHERE product_id = ? ORDER BY sort_order ASC, id ASC",
+        (product_id,),
+    ).fetchall()
+    images = [public_asset_url(row["image_url"]) for row in rows if row["image_url"]]
+    fallback_url = public_asset_url(fallback)
+    if fallback_url and fallback_url not in images:
+        images.insert(0, fallback_url)
+    return images[:5]
+
+
+def set_product_images(conn: sqlite3.Connection, product_id: int, image_urls: list[str]):
+    clean_urls = [storage_image_url(url) for url in image_urls if str(url or "").strip()][:5]
+    if not clean_urls:
+        clean_urls = [storage_image_url(None)]
+    conn.execute("DELETE FROM product_images WHERE product_id = ?", (product_id,))
+    for index, image_url in enumerate(clean_urls):
+        conn.execute(
+            "INSERT INTO product_images (product_id,image_url,sort_order,created_at) VALUES (?,?,?,?)",
+            (product_id, image_url, index, int(time.time())),
+        )
+    conn.execute("UPDATE products SET image_url=?, updated_at=? WHERE id=?", (clean_urls[0], int(time.time()), product_id))
+
+
+def serialize_product(row: sqlite3.Row | None, conn: sqlite3.Connection | None = None):
     product = row_dict(row)
     if product and "image_url" in product:
         product["image_url"] = public_asset_url(product["image_url"])
+        images = product_images(conn, product["id"], product["image_url"]) if conn else [product["image_url"]]
+        product["images"] = images
     return product
 
 
-def serialize_products(rows):
-    return [serialize_product(row) for row in rows]
+def serialize_products(rows, conn: sqlite3.Connection | None = None):
+    return [serialize_product(row, conn) for row in rows]
 
 
 def slugify(value: str) -> str:
@@ -371,6 +394,13 @@ def init_db():
               created_at INTEGER NOT NULL,
               updated_at INTEGER NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS product_images (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+              image_url TEXT NOT NULL,
+              sort_order INTEGER NOT NULL DEFAULT 0,
+              created_at INTEGER NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS orders (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               customer_name TEXT NOT NULL,
@@ -394,6 +424,7 @@ def init_db():
               order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
               product_id INTEGER NOT NULL REFERENCES products(id),
               title TEXT NOT NULL,
+              size TEXT NOT NULL DEFAULT 'Medium',
               price INTEGER NOT NULL,
               quantity INTEGER NOT NULL,
               line_total INTEGER NOT NULL
@@ -414,6 +445,7 @@ def init_db():
         ensure_column(conn, "orders", "subtotal", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(conn, "orders", "delivery_fee", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(conn, "orders", "transaction_reference", "TEXT")
+        ensure_column(conn, "order_items", "size", "TEXT NOT NULL DEFAULT 'Medium'")
         conn.execute("UPDATE orders SET subtotal = total WHERE subtotal = 0")
         if conn.execute("SELECT COUNT(*) FROM products").fetchone()[0] == 0:
             now = int(time.time())
@@ -425,6 +457,12 @@ def init_db():
                     VALUES (?,?,?,?,?,?,?,?,?,1,?,?)
                     """,
                     (slug, *item, now, now),
+                )
+        for product in conn.execute("SELECT id,image_url,created_at FROM products").fetchall():
+            if not conn.execute("SELECT id FROM product_images WHERE product_id = ? LIMIT 1", (product["id"],)).fetchone():
+                conn.execute(
+                    "INSERT INTO product_images (product_id,image_url,sort_order,created_at) VALUES (?,?,0,?)",
+                    (product["id"], product["image_url"], product["created_at"]),
                 )
 
 
@@ -440,7 +478,7 @@ def products(category: str | None = None, featured: bool | None = None):
         params.append(1 if featured else 0)
     query += " ORDER BY created_at DESC, id DESC"
     with db() as conn:
-        return serialize_products(conn.execute(query, params).fetchall())
+        return serialize_products(conn.execute(query, params).fetchall(), conn)
 
 
 @app.post("/api/orders")
@@ -451,10 +489,13 @@ def checkout(payload: CheckoutPayload):
     with db() as conn:
         quantities_by_id: dict[int, int] = {}
         for item in payload.items:
+            if item.size not in SIZE_OPTIONS:
+                raise HTTPException(status_code=400, detail="Choose a valid size.")
             quantities_by_id[item.product_id] = quantities_by_id.get(item.product_id, 0) + item.quantity
 
         subtotal = 0
         order_items = []
+        products_by_id = {}
         for product_id, quantity in quantities_by_id.items():
             if quantity > 99:
                 raise HTTPException(status_code=400, detail="Quantity cannot be higher than 99 per product.")
@@ -463,9 +504,13 @@ def checkout(payload: CheckoutPayload):
                 raise HTTPException(status_code=400, detail=f"{product['title']} is not available.")
             if product["stock"] < quantity:
                 raise HTTPException(status_code=400, detail=f"Only {product['stock']} left for {product['title']}.")
-            line_total = product["price"] * quantity
+            products_by_id[product_id] = product
+
+        for item in payload.items:
+            product = products_by_id[item.product_id]
+            line_total = product["price"] * item.quantity
             subtotal += line_total
-            order_items.append((product, quantity, line_total))
+            order_items.append((product, item.quantity, item.size, line_total))
 
         if subtotal <= 0:
             raise HTTPException(status_code=400, detail="Add at least one product to checkout.")
@@ -498,10 +543,10 @@ def checkout(payload: CheckoutPayload):
             ),
         )
         order_id = cursor.lastrowid
-        for product, quantity, line_total in order_items:
+        for product, quantity, size, line_total in order_items:
             conn.execute(
-                "INSERT INTO order_items (order_id,product_id,title,price,quantity,line_total) VALUES (?,?,?,?,?,?)",
-                (order_id, product["id"], product["title"], product["price"], quantity, line_total),
+                "INSERT INTO order_items (order_id,product_id,title,size,price,quantity,line_total) VALUES (?,?,?,?,?,?,?)",
+                (order_id, product["id"], product["title"], size, product["price"], quantity, line_total),
             )
             conn.execute("UPDATE products SET stock = stock - ?, updated_at = ? WHERE id = ?", (quantity, now, product["id"]))
         return {
@@ -621,7 +666,7 @@ def logout(authorization: Annotated[str | None, Header()] = None):
 @app.get("/api/admin/products")
 def admin_products(admin=Depends(require_permission("products:view"))):
     with db() as conn:
-        return serialize_products(conn.execute("SELECT * FROM products ORDER BY updated_at DESC, id DESC").fetchall())
+        return serialize_products(conn.execute("SELECT * FROM products ORDER BY updated_at DESC, id DESC").fetchall(), conn)
 
 
 @app.post("/api/admin/products")
@@ -642,22 +687,27 @@ def create_product(payload: ProductPayload, admin=Depends(require_permission("pr
             """,
             (slug, payload.title.strip(), payload.summary.strip(), payload.description.strip(), payload.price, payload.category, payload.stock, image_url, int(payload.featured), int(payload.active), now, now),
         )
-        return serialize_product(product_row(conn, cursor.lastrowid))
+        product_id = cursor.lastrowid
+        set_product_images(conn, product_id, [image_url])
+        return serialize_product(product_row(conn, product_id), conn)
 
 
 @app.put("/api/admin/products/{product_id}")
 def update_product(product_id: int, payload: ProductPayload, admin=Depends(require_permission("products:update"))):
     now = int(time.time())
     with db() as conn:
-        product_row(conn, product_id)
+        existing = product_row(conn, product_id)
+        next_image_url = storage_image_url(payload.image_url)
         conn.execute(
             """
             UPDATE products SET title=?,summary=?,description=?,price=?,category=?,stock=?,image_url=?,featured=?,active=?,updated_at=?
             WHERE id=?
             """,
-            (payload.title.strip(), payload.summary.strip(), payload.description.strip(), payload.price, payload.category, payload.stock, storage_image_url(payload.image_url), int(payload.featured), int(payload.active), now, product_id),
+            (payload.title.strip(), payload.summary.strip(), payload.description.strip(), payload.price, payload.category, payload.stock, next_image_url, int(payload.featured), int(payload.active), now, product_id),
         )
-        return serialize_product(product_row(conn, product_id))
+        if public_asset_url(existing["image_url"]) != public_asset_url(next_image_url):
+            set_product_images(conn, product_id, [next_image_url])
+        return serialize_product(product_row(conn, product_id), conn)
 
 
 @app.patch("/api/admin/products/{product_id}/stock")
@@ -665,22 +715,46 @@ def update_stock(product_id: int, payload: StockPayload, admin=Depends(require_p
     with db() as conn:
         product_row(conn, product_id)
         conn.execute("UPDATE products SET stock=?, updated_at=? WHERE id=?", (payload.stock, int(time.time()), product_id))
-        return serialize_product(product_row(conn, product_id))
+        return serialize_product(product_row(conn, product_id), conn)
 
 
 @app.post("/api/admin/products/{product_id}/image")
-async def upload_product_image(product_id: int, image: UploadFile = File(...), admin=Depends(require_permission("products:update"))):
-    if image.content_type not in {"image/jpeg", "image/png", "image/webp", "image/gif"}:
-        raise HTTPException(status_code=400, detail="Upload a JPG, PNG, WebP, or GIF image.")
-    suffix = Path(image.filename or "").suffix.lower() or ".jpg"
-    filename = f"product-{product_id}-{secrets.token_hex(8)}{suffix}"
-    target = UPLOAD_DIR / filename
-    target.write_bytes(await image.read())
-    image_url = f"/assets/uploads/{filename}"
+async def upload_product_image(
+    product_id: int,
+    images: list[UploadFile] = File(default=[]),
+    image_slots: list[int] = Form(default=[]),
+    existing_images: list[str] = Form(default=[]),
+    admin=Depends(require_permission("products:update")),
+):
+    if len(images) > 5:
+        raise HTTPException(status_code=400, detail="Upload up to 5 images for one product.")
+    if image_slots and len(image_slots) != len(images):
+        raise HTTPException(status_code=400, detail="Image slot data did not match uploaded images.")
+
+    image_urls = [public_asset_url(str(url or "").strip()) if str(url or "").strip() else "" for url in existing_images[:5]]
+    while len(image_urls) < 5:
+        image_urls.append("")
+
+    for index, image in enumerate(images):
+        if image.content_type not in {"image/jpeg", "image/png", "image/webp", "image/gif"}:
+            raise HTTPException(status_code=400, detail="Upload JPG, PNG, WebP, or GIF images.")
+        slot = image_slots[index] if image_slots else index
+        if slot < 0 or slot > 4:
+            raise HTTPException(status_code=400, detail="Image slots must be between 1 and 5.")
+        suffix = Path(image.filename or "").suffix.lower() or ".jpg"
+        filename = f"product-{product_id}-{secrets.token_hex(8)}{suffix}"
+        target = UPLOAD_DIR / filename
+        target.write_bytes(await image.read())
+        image_urls[slot] = f"/assets/uploads/{filename}"
+
+    image_urls = [url for url in image_urls if str(url or "").strip()]
+    if not image_urls:
+        raise HTTPException(status_code=400, detail="Upload at least one image.")
+
     with db() as conn:
         product_row(conn, product_id)
-        conn.execute("UPDATE products SET image_url=?, updated_at=? WHERE id=?", (image_url, int(time.time()), product_id))
-    return {"image_url": image_url}
+        set_product_images(conn, product_id, image_urls)
+    return {"image_url": image_urls[0], "images": image_urls}
 
 
 @app.delete("/api/admin/products/{product_id}")
@@ -825,21 +899,6 @@ def admin_panel_file():
     return FileResponse(ADMIN_DIR / "panel.html")
 
 
-@app.get("/styles.css")
-def legacy_styles():
-    return FileResponse(PUBLIC_DIR / "css" / "styles.css")
-
-
-@app.get("/catalog-pages.css")
-def legacy_catalog_styles():
-    return FileResponse(PUBLIC_DIR / "css" / "catalog-pages.css")
-
-
-@app.get("/script.js")
-def legacy_script():
-    return FileResponse(PUBLIC_DIR / "js" / "script.js")
-
-
 @app.get("/admin.css")
 def legacy_admin_styles():
     return FileResponse(ADMIN_DIR / "admin.css")
@@ -862,8 +921,6 @@ def admin_nested_script():
 
 app.mount("/app-assets", StaticFiles(directory=DIST_DIR / "app-assets", check_dir=False), name="app-assets")
 app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
-app.mount("/css", StaticFiles(directory=PUBLIC_DIR / "css"), name="css")
-app.mount("/js", StaticFiles(directory=PUBLIC_DIR / "js"), name="js")
 app.mount("/admin-static", StaticFiles(directory=ADMIN_DIR), name="admin-static")
 
 
@@ -871,7 +928,7 @@ def storefront_index():
     index = DIST_DIR / "index.html"
     if index.exists():
         return FileResponse(index)
-    return FileResponse(PUBLIC_DIR / "index.html")
+    raise HTTPException(status_code=404, detail="React build not found. Run `npm run build` first.")
 
 
 @app.get("/")
@@ -881,6 +938,11 @@ def home_page():
 
 @app.get("/{filename}")
 def public_file(filename: str):
-    if filename in PUBLIC_FILES or filename in SPA_ROUTES:
+    if filename in SPA_ROUTES:
         return storefront_index()
     raise HTTPException(status_code=404, detail="Not found.")
+
+
+@app.get("/products/{slug}")
+def product_page(slug: str):
+    return storefront_index()

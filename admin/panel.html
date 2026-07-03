@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="admin.css?v=2">
+  <link rel="stylesheet" href="admin.css?v=4">
 </head>
 <body>
   <main class="admin-app" id="adminApp">
@@ -62,12 +62,20 @@
             <input type="hidden" name="id">
             <label>Title<input name="title" required minlength="2"></label>
             <label>Price<input name="price" type="number" min="0" required></label>
-            <label>Category<select name="category"><option value="new-arrivals">New Arrivals</option><option value="the-silk-edit">The Silk Edit</option><option value="everyday-memo">Everyday Memo</option><option value="occasion-wear">Occasion Wear</option></select></label>
+            <label>Category<select name="category"><option value="new-arrivals">New Arrivals</option></select></label>
             <label>Stock<input name="stock" type="number" min="0" required></label>
             <label class="wide">Short info<input name="summary" required minlength="2"></label>
             <label class="wide">Description<textarea name="description" required minlength="2"></textarea></label>
             <label class="wide">Image URL<input name="image_url" placeholder="../assets/photos/img_9828.jpg"></label>
-            <label class="wide">Upload image<input name="image" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label>
+            <div class="wide upload-fields">
+              <span>Upload images</span>
+              <small>Choose each image separately. Image 1 is used as the thumbnail.</small>
+              <label>Image 1<input name="image_1" data-product-image-input data-image-slot="0" type="file" accept="image/png,image/jpeg,image/webp,image/gif"><span class="image-slot-preview" data-image-preview="0"></span></label>
+              <label>Image 2<input name="image_2" data-product-image-input data-image-slot="1" type="file" accept="image/png,image/jpeg,image/webp,image/gif"><span class="image-slot-preview" data-image-preview="1"></span></label>
+              <label>Image 3<input name="image_3" data-product-image-input data-image-slot="2" type="file" accept="image/png,image/jpeg,image/webp,image/gif"><span class="image-slot-preview" data-image-preview="2"></span></label>
+              <label>Image 4<input name="image_4" data-product-image-input data-image-slot="3" type="file" accept="image/png,image/jpeg,image/webp,image/gif"><span class="image-slot-preview" data-image-preview="3"></span></label>
+              <label>Image 5<input name="image_5" data-product-image-input data-image-slot="4" type="file" accept="image/png,image/jpeg,image/webp,image/gif"><span class="image-slot-preview" data-image-preview="4"></span></label>
+            </div>
             <label class="check"><input name="featured" type="checkbox"> Featured on homepage</label>
             <label class="check"><input name="active" type="checkbox" checked> Publicly visible</label>
             <div class="form-actions">
@@ -130,6 +138,6 @@
     </section>
   </main>
 
-  <script src="admin.js?v=3"></script>
+  <script src="admin.js?v=5"></script>
 </body>
 </html>

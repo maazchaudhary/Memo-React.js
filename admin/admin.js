@@ -41,6 +41,13 @@ function showNotice(message, ok = false) {
   notice.style.color = ok ? "#4f6b52" : "#8b4148";
 }
 
+function setProductSaveState(form, isSaving) {
+  const button = form?.querySelector('button[type="submit"]');
+  if (!button) return;
+  button.disabled = isSaving;
+  button.textContent = isSaving ? "Saving..." : "Save product";
+}
+
 function setAuthMessage(message, ok = false) {
   const authMessage = document.querySelector("#authMessage");
   if (!authMessage) return;
@@ -153,6 +160,30 @@ function label(value) {
   return String(value || "").split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
 }
 
+function clearProductImageSlots(form) {
+  form.querySelectorAll("[data-product-image-input]").forEach((input) => {
+    input.value = "";
+    input.dataset.currentImageUrl = "";
+  });
+  form.querySelectorAll("[data-image-preview]").forEach((preview) => {
+    preview.innerHTML = "";
+  });
+}
+
+function setProductImageSlots(form, product) {
+  const images = Array.isArray(product.images) && product.images.length ? product.images : [product.image_url].filter(Boolean);
+  clearProductImageSlots(form);
+  form.querySelectorAll("[data-product-image-input]").forEach((input) => {
+    const slot = Number(input.dataset.imageSlot);
+    const imageUrl = images[slot] || "";
+    const preview = form.querySelector(`[data-image-preview="${slot}"]`);
+    input.dataset.currentImageUrl = imageUrl;
+    if (preview && imageUrl) {
+      preview.innerHTML = `<img src="${escapeHtml(imageUrl)}" alt="Current image ${slot + 1}"><small>Current image ${slot + 1}</small>`;
+    }
+  });
+}
+
 function editProduct(id) {
   const product = products.find((item) => item.id === id);
   const form = document.querySelector("#productForm");
@@ -165,6 +196,7 @@ function editProduct(id) {
   fields.summary.value = product.summary;
   fields.description.value = product.description;
   fields.image_url.value = product.image_url;
+  setProductImageSlots(form, product);
   fields.featured.checked = Boolean(product.featured);
   fields.active.checked = Boolean(product.active);
   document.querySelector("#productFormTitle").textContent = "Edit Product";
@@ -186,18 +218,36 @@ async function saveProduct(event) {
     featured: fields.featured.checked,
     active: fields.active.checked
   };
+  const imageInputs = [...form.querySelectorAll("[data-product-image-input]")];
+  const imageFiles = imageInputs
+    .map((input) => ({ file: input.files?.[0], slot: Number(input.dataset.imageSlot) }))
+    .filter((item) => item.file);
   const id = fields.id.value;
-  const saved = await request(id ? `/api/admin/products/${id}` : "/api/admin/products", { method: id ? "PUT" : "POST", body: JSON.stringify(payload) });
-  if (fields.image.files.length) {
-    const upload = new FormData();
-    upload.append("image", fields.image.files[0]);
-    await request(`/api/admin/products/${saved.id}/image`, { method: "POST", body: upload });
+  setProductSaveState(form, true);
+  showNotice("Saving product...");
+  try {
+    const saved = await request(id ? `/api/admin/products/${id}` : "/api/admin/products", { method: id ? "PUT" : "POST", body: JSON.stringify(payload) });
+    showNotice("Product details saved. Updating page...", true);
+    await loadProducts();
+    if (imageFiles.length) {
+      const upload = new FormData();
+      imageInputs.forEach((input) => upload.append("existing_images", input.dataset.currentImageUrl || ""));
+      imageFiles.forEach(({ file, slot }) => {
+        upload.append("image_slots", String(slot));
+        upload.append("images", file);
+      });
+      await request(`/api/admin/products/${saved.id}/image`, { method: "POST", body: upload });
+      await loadProducts();
+    }
+    resetProductForm();
+    await loadSales().catch(() => {});
+    renderDashboard();
+    showNotice(imageFiles.length ? "Product and images saved." : "Product saved.", true);
+  } catch (error) {
+    showNotice(error.message || "Product could not be saved.");
+  } finally {
+    setProductSaveState(form, false);
   }
-  resetProductForm();
-  await loadProducts();
-  await loadSales().catch(() => {});
-  renderDashboard();
-  showNotice("Product saved.", true);
 }
 
 function resetProductForm() {
@@ -205,6 +255,7 @@ function resetProductForm() {
   form.reset();
   form.elements.id.value = "";
   form.elements.active.checked = true;
+  clearProductImageSlots(form);
   document.querySelector("#productFormTitle").textContent = "Add Product";
 }
 
@@ -259,7 +310,7 @@ function renderOrders() {
     <tr>
       <td><strong>${escapeHtml(order.order_number || `MEMO-${String(order.id).padStart(5, "0")}`)}</strong><small>#${Number(order.id)}</small></td>
       <td><strong>${escapeHtml(order.customer_name)}</strong><small>${escapeHtml(order.phone)}<br>${escapeHtml(order.email)}<br>${escapeHtml(order.address)}, ${escapeHtml(order.city)}${order.notes ? `<br>Notes: ${escapeHtml(order.notes)}` : ""}</small></td>
-      <td>${order.items.map((item) => `${escapeHtml(item.title)} x ${Number(item.quantity || 0)}`).join("<br>")}</td>
+      <td>${order.items.map((item) => `${escapeHtml(item.title)}<small>Size: ${escapeHtml(item.size || "Medium")} · Qty: ${Number(item.quantity || 0)}</small>`).join("")}</td>
       <td>${money(order.total)}<small>Subtotal ${money(order.subtotal || order.total)}<br>Delivery ${money(order.delivery_fee || 0)}</small></td>
       <td>${escapeHtml(order.payment_method)}</td>
       <td><select class="status-select" data-payment-status="${Number(order.id)}" ${can("orders:update") ? "" : "disabled"}>

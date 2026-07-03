@@ -1,14 +1,8 @@
-# Memo By Miraal Storefront Projects + Admin
-
-
-- `react-website/` - React/Vite storefront
-
-The FastAPI backend and admin panel remain at the repository root.
+# Memo By Miraal Storefront + Admin
 
 ## React Website
 
 ```powershell
-cd react-website
 npm install
 npm run dev
 ```
@@ -16,12 +10,10 @@ npm run dev
 For the React production build:
 
 ```powershell
-cd react-website
 npm run build
 ```
 
-The FastAPI backend serves this React build from `react-website/dist` when you run the backend from the repository root.
-
+The FastAPI backend serves the React production build from `dist/`. The `public/` folder is only for React assets that need to be copied as-is, such as product photos, the logo, and the favicon.
 
 ## Backend + Admin
 

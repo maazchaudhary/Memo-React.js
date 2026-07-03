@@ -66,6 +66,14 @@ textarea { min-height: 100px; resize: vertical; }
 .form-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
 .form-grid h2, .wide, .form-actions { grid-column: 1/-1; }
 label { display: grid; gap: 6px; color: #555; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+label small { color: #777; font-size: 11px; letter-spacing: 0; line-height: 1.5; text-transform: none; }
+.upload-fields { display: grid; gap: 10px; color: #555; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+.upload-fields > small { margin-top: -4px; color: #777; font-size: 11px; letter-spacing: 0; line-height: 1.5; text-transform: none; }
+.upload-fields label { padding: 10px; border: 1px solid var(--line); background: #fafafa; }
+.upload-fields input { background: #fff; }
+.image-slot-preview { display: none; align-items: center; gap: 10px; min-height: 54px; margin-top: 2px; color: #666; font-size: 11px; letter-spacing: 0; text-transform: none; }
+.image-slot-preview:not(:empty) { display: flex; }
+.image-slot-preview img { width: 44px; height: 54px; border: 1px solid var(--line); object-fit: cover; object-position: center top; background: #fff; }
 .check { display: flex; align-items: center; gap: 8px; text-transform: none; letter-spacing: 0; }
 .check input { width: auto; }
 .form-actions { display: flex; gap: 10px; flex-wrap: wrap; }
