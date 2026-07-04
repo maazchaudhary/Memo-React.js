@@ -13,7 +13,7 @@ For the React production build:
 npm run build
 ```
 
-The FastAPI backend serves the React production build from `dist/`. The `public/` folder is only for React assets that need to be copied as-is, such as product photos, the logo, and the favicon.
+The FastAPI backend serves the React production build from `dist/` and static storefront assets from `assets/`.
 
 ## Backend + Admin
 
@@ -70,6 +70,7 @@ Gmail requires a Google App Password, not your normal Gmail password. After edit
 ## Data
 
 - SQLite database: `memo.sqlite3`
+- Storefront assets: `assets/`
 - Uploaded product images: `assets/uploads/`
 - Passwords are hashed with PBKDF2-SHA256.
 - Admin routes require bearer-token sessions and server-side permission checks.
