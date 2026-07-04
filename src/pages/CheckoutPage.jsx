@@ -20,7 +20,7 @@ export default function CheckoutPage({ cart, totals, currency, navigate, setCart
     const payload = Object.fromEntries(new FormData(formElement).entries());
     payload.payment_method = paymentMethod;
     payload.currency = currency;
-    payload.items = cart.map(({ product_id, quantity, size }) => ({ product_id, quantity, size: size || "Medium" }));
+    payload.items = cart.map(({ product_id, quantity, size, add_ons }) => ({ product_id, quantity, size: size || "Medium", add_ons: add_ons || [] }));
 
     setMessage("Placing your order...");
 

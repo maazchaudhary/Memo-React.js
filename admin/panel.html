@@ -78,6 +78,7 @@
             </div>
             <label class="check"><input name="featured" type="checkbox"> Featured on homepage</label>
             <label class="check"><input name="active" type="checkbox" checked> Publicly visible</label>
+            <label class="check"><input name="out_of_stock" type="checkbox"> Manually mark out of stock</label>
             <div class="form-actions">
               <button type="submit">Save product</button>
               <button type="button" id="resetProductForm">Clear</button>
@@ -93,21 +94,21 @@
       <section class="section" id="inventorySection">
         <div class="panel">
           <h2>Inventory</h2>
-          <div class="table-wrap"><table><thead><tr><th>Product</th><th>Stock</th><th>Status</th><th>Update</th></tr></thead><tbody id="inventoryTable"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>Product</th><th>Available Inventory</th><th>Manual Status</th><th>Update</th></tr></thead><tbody id="inventoryTable"></tbody></table></div>
         </div>
       </section>
 
       <section class="section" id="ordersSection">
         <div class="panel">
           <h2>Customer Orders</h2>
-          <div class="table-wrap"><table><thead><tr><th>Order ID</th><th>Customer Details</th><th>Items</th><th>Total</th><th>Payment Method</th><th>Payment Status</th><th>Reference</th><th>Order Status</th><th>Date</th></tr></thead><tbody id="ordersTable"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>Order ID</th><th>Customer Details</th><th>Items</th><th>Add-ons</th><th>Total</th><th>Payment Method</th><th>Payment Status</th><th>Reference</th><th>Order Status</th><th>Date</th></tr></thead><tbody id="ordersTable"></tbody></table></div>
         </div>
       </section>
 
       <section class="section" id="requestsSection">
         <div class="panel">
-          <h2>Item Requests</h2>
-          <div class="table-wrap"><table><thead><tr><th>ID</th><th>Product</th><th>Customer</th><th>Notes</th><th>Status</th><th>Date</th></tr></thead><tbody id="requestsTable"></tbody></table></div>
+          <h2>Inventory Requests</h2>
+          <div class="table-wrap"><table><thead><tr><th>Request</th><th>Order ID</th><th>Product</th><th>Customer Details</th><th>Quantities</th><th>Notes</th><th>Status</th><th>Date</th></tr></thead><tbody id="requestsTable"></tbody></table></div>
         </div>
       </section>
 

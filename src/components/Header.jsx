@@ -11,6 +11,7 @@ export default function Header({ navigate, menuOpen, setMenuOpen, cartQuantity, 
       <Link className="logo" to="/" navigate={navigate} aria-label="Memo home"><img src="/assets/memo-logo.png" alt="Memo" /></Link>
       <div className="tools">
         <label className="currency" aria-label="Currency">
+          <span className="currency-code" aria-hidden="true">{currencies[currency]?.label || currency}</span>
           <select value={currency} onChange={(event) => setCurrency(event.target.value)}>
             {Object.entries(currencies).map(([code, config]) => <option key={code} value={code}>{config.name}</option>)}
           </select>

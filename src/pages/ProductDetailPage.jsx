@@ -6,27 +6,44 @@ import Icon from "../components/Icon";
 import ProductCard from "../components/ProductCard";
 import { money } from "../utils/money";
 import { productGallery } from "../utils/product";
+import { addOnOptions, addOnsTotal, normalizeAddOns } from "../utils/cart";
 
 export default function ProductDetailPage({ product, products, currency, navigate, onAdd, message, stockRequestOpen, setStockRequestOpen }) {
   const [requestMessage, setRequestMessage] = useState("");
   const [imageIndex, setImageIndex] = useState(0);
   const [selectedSize, setSelectedSize] = useState("Medium");
+  const [quantity, setQuantity] = useState(1);
+  const [selectedAddOns, setSelectedAddOns] = useState([]);
   const [zoomed, setZoomed] = useState(false);
   const [zoomOrigin, setZoomOrigin] = useState("50% 50%");
 
   const gallery = productGallery(product);
   const activeImageIndex = gallery[imageIndex] ? imageIndex : 0;
+  const maxQuantity = 99;
+  const isManuallyOutOfStock = Boolean(product?.out_of_stock);
   const latestArrivals = products.filter((item) => item.id !== product?.id).slice(0, 4);
   const CustomerFavorites = products
-    .filter((item) => item.id !== product?.id && Number(item.stock) > 0)
+    .filter((item) => item.id !== product?.id && !item.out_of_stock)
     .sort((a, b) => Number(a.stock || 0) - Number(b.stock || 0))
     .slice(0, 4);
+  const selectedAddOnsTotal = addOnsTotal(selectedAddOns);
+  const displayPrice = Number(product?.price || 0) + selectedAddOnsTotal;
 
   useEffect(() => {
     setImageIndex(0);
     setSelectedSize("Medium");
+    setQuantity(1);
+    setSelectedAddOns([]);
     setZoomed(false);
   }, [product?.id]);
+
+  useEffect(() => {
+    setQuantity((current) => Math.min(Math.max(1, current), maxQuantity));
+  }, [maxQuantity]);
+
+  function updateQuantity(nextQuantity) {
+    setQuantity(Math.min(maxQuantity, Math.max(1, nextQuantity)));
+  }
 
   function moveZoom(event) {
     if (!zoomed) return;
@@ -34,6 +51,15 @@ export default function ProductDetailPage({ product, products, currency, navigat
     const x = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100));
     const y = Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100));
     setZoomOrigin(`${x}% ${y}%`);
+  }
+
+  function toggleAddOn(addOnId) {
+    setSelectedAddOns((current) => {
+      const normalized = normalizeAddOns(current);
+      return normalized.includes(addOnId)
+        ? normalized.filter((item) => item !== addOnId)
+        : normalizeAddOns([...normalized, addOnId]);
+    });
   }
 
   if (!product) {
@@ -110,9 +136,8 @@ export default function ProductDetailPage({ product, products, currency, navigat
         <div className="product-detail-copy">
           <p className="eyebrow">Memo collection</p>
           <h1>{product.title}</h1>
-          <p className="product-detail-price">{money(product.price, currency)}</p>
+          <p className="product-detail-price">{money(displayPrice, currency)}</p>
           <p className="product-detail-summary">{product.summary}</p>
-          <p className="product-detail-description">{product.description}</p>
 
           <div className="size-selector" aria-label="Select size">
             <span>Size</span>
@@ -125,19 +150,46 @@ export default function ProductDetailPage({ product, products, currency, navigat
             </div>
           </div>
 
-          <div className="quick-view-notes">
-            <span>Embroidered finish</span>
-            <span>Made in Pakistan</span>
-            <span>Dry clean only</span>
+          {!isManuallyOutOfStock && (
+            <div className="product-quantity" aria-label="Select quantity">
+              <span>Quantity</span>
+              <div className="quantity-stepper">
+                <button type="button" aria-label="Decrease quantity" disabled={quantity <= 1} onClick={() => updateQuantity(quantity - 1)}>
+                  -
+                </button>
+                <strong aria-live="polite">{quantity}</strong>
+                <button type="button" aria-label="Increase quantity" disabled={quantity >= maxQuantity} onClick={() => updateQuantity(quantity + 1)}>
+                  +
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="product-add-ons">
+            <span>You May Also Add</span>
+            <div>
+              {addOnOptions.map((option) => (
+                <label key={option.id}>
+                  <input
+                    type="checkbox"
+                    checked={selectedAddOns.includes(option.id)}
+                    onChange={() => toggleAddOn(option.id)}
+                  />
+                  <span>{option.label} - {money(option.price, currency)}</span>
+                </label>
+              ))}
+            </div>
           </div>
 
-          {product.stock <= 0 && <small className="stock-note disabled">Currently out of stock</small>}
+          {isManuallyOutOfStock && <small className="stock-note disabled">Out of Stock</small>}
 
-          <button className="add-to-cart" type="button" onClick={() => onAdd(product, selectedSize)}>
-            {product.stock <= 0 ? "Request availability" : "Add to cart"}
+          <button className="add-to-cart" type="button" onClick={() => onAdd(product, selectedSize, quantity, selectedAddOns)}>
+            {isManuallyOutOfStock ? "Request Product" : "Add to cart"}
           </button>
 
           <p className="cart-message" aria-live="polite">{requestMessage || message}</p>
+
+          <p className="product-detail-description">{product.description}</p>
 
           {stockRequestOpen && (
             <form className="stock-request-form" id="stockRequestForm" onSubmit={submitStockRequest}>

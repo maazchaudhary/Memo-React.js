@@ -1,7 +1,30 @@
 import { cartKey, confirmationKey, currencyKey, currencies } from "../data/storeConfig";
 
-export function cartItemKey(id, size = "Medium") {
-  return `${id}:${size || "Medium"}`;
+export const addOnOptions = [
+  { id: "pants", label: "Pants", price: 4500 },
+  { id: "dupatta", label: "Dupatta", price: 3500 }
+];
+
+export function normalizeAddOns(addOns = []) {
+  const selected = Array.isArray(addOns) ? addOns : [];
+  const selectedIds = new Set(selected.map((item) => String(item || "").toLowerCase()));
+  return addOnOptions.filter((option) => selectedIds.has(option.id)).map((option) => option.id);
+}
+
+export function addOnsTotal(addOns = []) {
+  const selected = new Set(normalizeAddOns(addOns));
+  return addOnOptions.reduce((sum, option) => sum + (selected.has(option.id) ? option.price : 0), 0);
+}
+
+export function addOnsLabel(addOns = []) {
+  const selected = new Set(normalizeAddOns(addOns));
+  const labels = addOnOptions.filter((option) => selected.has(option.id)).map((option) => option.label);
+  return labels.length ? labels.join(", ") : "None";
+}
+
+export function cartItemKey(id, size = "Medium", addOns = []) {
+  const addOnKey = normalizeAddOns(addOns).join("+") || "none";
+  return `${id}:${size || "Medium"}:${addOnKey}`;
 }
 
 export function readCart() {

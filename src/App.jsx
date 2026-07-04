@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { seedProducts } from "./data/products";
 import { categoryPages, infoPages } from "./data/pages";
 import { cartKey, currencyKey, deliveryFee, sizeOptions } from "./data/storeConfig";
-import { readCart, readConfirmation, readCurrency, cartItemKey } from "./utils/cart";
+import { readCart, readConfirmation, readCurrency, cartItemKey, addOnsLabel, addOnsTotal, normalizeAddOns } from "./utils/cart";
 import { normalizePath } from "./utils/routing";
 import { assetUrl, findProductBySlug } from "./utils/product";
 
@@ -130,33 +130,27 @@ export default function App() {
     }, 0);
   }
 
-  function addToCart(product, size = "Medium") {
+  function addToCart(product, size = "Medium", quantity = 1, addOns = []) {
     if (!product) return;
 
-    if (Number(product.stock || 0) <= 0) {
-      setMessage(`Tell us where to reach you when ${product.title} is back.`);
+    if (product.out_of_stock) {
+      setMessage(`Tell us where to reach you about ${product.title}.`);
       setStockRequestOpen(true);
       return;
     }
 
     const selectedSize = sizeOptions.includes(size) ? size : "Medium";
-    const key = cartItemKey(product.id, selectedSize);
-    const productQuantity = cart
-      .filter((item) => item.product_id === product.id)
-      .reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-
-    const existing = cart.find((item) => (item.key || cartItemKey(item.product_id, item.size)) === key);
-
-    if ((existing?.quantity || 0) >= product.stock || productQuantity >= product.stock) {
-      setMessage(`Only limited stock is available for ${product.title}.`);
-      return;
-    }
+    const selectedQuantity = Math.max(1, Math.floor(Number(quantity || 1)));
+    const selectedAddOns = normalizeAddOns(addOns);
+    const selectedAddOnsTotal = addOnsTotal(selectedAddOns);
+    const key = cartItemKey(product.id, selectedSize, selectedAddOns);
+    const existing = cart.find((item) => (item.key || cartItemKey(item.product_id, item.size, item.add_ons)) === key);
 
     setCart((items) =>
       existing
         ? items.map((item) =>
-            (item.key || cartItemKey(item.product_id, item.size)) === key
-              ? { ...item, quantity: Number(item.quantity || 0) + 1, size: selectedSize, key }
+            (item.key || cartItemKey(item.product_id, item.size, item.add_ons)) === key
+              ? { ...item, quantity: Number(item.quantity || 0) + selectedQuantity, size: selectedSize, add_ons: selectedAddOns, add_ons_total: selectedAddOnsTotal, key }
               : item
           )
         : [
@@ -164,60 +158,48 @@ export default function App() {
             {
               key,
               product_id: product.id,
-              quantity: 1,
+              quantity: selectedQuantity,
               size: selectedSize,
               title: product.title,
-              price: product.price,
+              base_price: product.price,
+              price: Number(product.price || 0) + selectedAddOnsTotal,
+              add_ons: selectedAddOns,
+              add_ons_total: selectedAddOnsTotal,
               image_url: assetUrl(product.image_url),
               stock: product.stock
             }
           ]
     );
 
-    setMessage(`${product.title} (${selectedSize}) has been added to your bag.`);
+    setMessage(`${selectedQuantity} x ${product.title} (${selectedSize}${selectedAddOns.length ? `, ${addOnsLabel(selectedAddOns)}` : ""}) added to your bag.`);
     setStockRequestOpen(false);
     setCartOpen(true);
-  }
-
-  function updateQuantity(itemKey, value) {
-    const quantity = Math.max(1, Number(value || 1));
-
-    setCart((items) =>
-      items.map((item) => {
-        const key = item.key || cartItemKey(item.product_id, item.size);
-        if (key !== itemKey) return item;
-        return { ...item, quantity: Math.min(Number(item.stock || quantity), quantity) };
-      })
-    );
   }
 
   function updateSize(itemKey, nextSize) {
     if (!sizeOptions.includes(nextSize)) return;
 
     setCart((items) => {
-      const selected = items.find((item) => (item.key || cartItemKey(item.product_id, item.size)) === itemKey);
+      const selected = items.find((item) => (item.key || cartItemKey(item.product_id, item.size, item.add_ons)) === itemKey);
       if (!selected) return items;
 
-      const nextKey = cartItemKey(selected.product_id, nextSize);
-      const duplicate = items.find((item) => (item.key || cartItemKey(item.product_id, item.size)) === nextKey);
+      const nextKey = cartItemKey(selected.product_id, nextSize, selected.add_ons);
+      const duplicate = items.find((item) => (item.key || cartItemKey(item.product_id, item.size, item.add_ons)) === nextKey);
 
       if (duplicate && duplicate !== selected) {
-        const mergedQuantity = Math.min(
-          Number(duplicate.quantity || 0) + Number(selected.quantity || 0),
-          Number(duplicate.stock || selected.stock || 1)
-        );
+        const mergedQuantity = Number(duplicate.quantity || 0) + Number(selected.quantity || 0);
 
         return items
-          .filter((item) => (item.key || cartItemKey(item.product_id, item.size)) !== itemKey)
+          .filter((item) => (item.key || cartItemKey(item.product_id, item.size, item.add_ons)) !== itemKey)
           .map((item) =>
-            (item.key || cartItemKey(item.product_id, item.size)) === nextKey
+            (item.key || cartItemKey(item.product_id, item.size, item.add_ons)) === nextKey
               ? { ...item, quantity: mergedQuantity, size: nextSize, key: nextKey }
               : item
           );
       }
 
       return items.map((item) =>
-        (item.key || cartItemKey(item.product_id, item.size)) === itemKey
+        (item.key || cartItemKey(item.product_id, item.size, item.add_ons)) === itemKey
           ? { ...item, key: nextKey, size: nextSize }
           : item
       );
@@ -225,7 +207,7 @@ export default function App() {
   }
 
   function removeItem(itemKey) {
-    setCart((items) => items.filter((item) => (item.key || cartItemKey(item.product_id, item.size)) !== itemKey));
+    setCart((items) => items.filter((item) => (item.key || cartItemKey(item.product_id, item.size, item.add_ons)) !== itemKey));
   }
 
   const productSlugFromPath = path.startsWith("/products/") ? path.replace("/products/", "") : "";
@@ -242,7 +224,6 @@ export default function App() {
         totals={totals}
         currency={currency}
         navigate={navigate}
-        updateQuantity={updateQuantity}
         updateSize={updateSize}
         removeItem={removeItem}
         openCart={() => setCartOpen(true)}
@@ -311,7 +292,6 @@ export default function App() {
         totals={totals}
         currency={currency}
         navigate={navigate}
-        updateQuantity={updateQuantity}
         updateSize={updateSize}
         removeItem={removeItem}
       />

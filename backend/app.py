@@ -65,6 +65,10 @@ DELIVERY_FEE = int(os.getenv("MEMO_DELIVERY_FEE", "250"))
 PAYMENT_METHODS = {"Cash on Delivery", "Bank Transfer", "EasyPaisa / JazzCash"}
 MANUAL_PAYMENT_METHODS = {"Bank Transfer", "EasyPaisa / JazzCash"}
 SIZE_OPTIONS = {"Extra Small", "Small", "Medium", "Large", "Custom"}
+ADD_ON_OPTIONS = {
+    "pants": {"label": "Pants", "price": 4500},
+    "dupatta": {"label": "Dupatta", "price": 3500},
+}
 
 app = FastAPI(title="Memo by Miraal Admin API")
 logger = logging.getLogger("memo")
@@ -130,16 +134,19 @@ class ProductPayload(BaseModel):
     image_url: str | None = Field(default=None, max_length=500)
     featured: bool = False
     active: bool = True
+    out_of_stock: bool = False
 
 
 class StockPayload(BaseModel):
     stock: int = Field(ge=0)
+    out_of_stock: bool | None = None
 
 
 class OrderItemPayload(BaseModel):
     product_id: int
     quantity: int = Field(ge=1, le=99)
     size: str = Field(default="Medium", min_length=2, max_length=40)
+    add_ons: list[str] = Field(default_factory=list, max_length=2)
 
 
 class CheckoutPayload(BaseModel):
@@ -171,7 +178,7 @@ class PaymentStatusPayload(BaseModel):
 
 
 class StockRequestStatusPayload(BaseModel):
-    status: Literal["Pending", "Contacted", "Closed"]
+    status: Literal["Pending", "Arranged", "Completed", "Cancelled"]
 
 
 class RolePayload(BaseModel):
@@ -252,6 +259,26 @@ def slugify(value: str) -> str:
 
 def order_number(order_id: int):
     return f"MEMO-{order_id:05d}"
+
+
+def normalize_add_ons(add_ons: list[str] | None):
+    selected = []
+    for add_on in add_ons or []:
+        add_on_id = str(add_on or "").strip().lower()
+        if add_on_id not in ADD_ON_OPTIONS:
+            raise HTTPException(status_code=400, detail="Choose valid add-ons.")
+        if add_on_id not in selected:
+            selected.append(add_on_id)
+    return selected
+
+
+def add_ons_total(add_ons: list[str] | None):
+    return sum(ADD_ON_OPTIONS[add_on]["price"] for add_on in normalize_add_ons(add_ons))
+
+
+def add_ons_label(add_ons: list[str] | None):
+    selected = normalize_add_ons(add_ons)
+    return ", ".join(ADD_ON_OPTIONS[add_on]["label"] for add_on in selected) if selected else "None"
 
 
 def password_hash(password: str) -> str:
@@ -398,6 +425,7 @@ def init_db():
               image_url TEXT NOT NULL,
               featured INTEGER NOT NULL DEFAULT 0,
               active INTEGER NOT NULL DEFAULT 1,
+              out_of_stock INTEGER NOT NULL DEFAULT 0,
               created_at INTEGER NOT NULL,
               updated_at INTEGER NOT NULL
             );
@@ -433,6 +461,8 @@ def init_db():
               title TEXT NOT NULL,
               size TEXT NOT NULL DEFAULT 'Medium',
               price INTEGER NOT NULL,
+              add_ons TEXT NOT NULL DEFAULT 'None',
+              add_ons_total INTEGER NOT NULL DEFAULT 0,
               quantity INTEGER NOT NULL,
               line_total INTEGER NOT NULL
             );
@@ -440,9 +470,13 @@ def init_db():
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               product_id INTEGER NOT NULL REFERENCES products(id),
               product_title TEXT NOT NULL,
+              order_id INTEGER REFERENCES orders(id),
               customer_name TEXT NOT NULL,
               phone TEXT NOT NULL,
               email TEXT NOT NULL,
+              ordered_quantity INTEGER NOT NULL DEFAULT 0,
+              available_quantity INTEGER NOT NULL DEFAULT 0,
+              additional_quantity INTEGER NOT NULL DEFAULT 0,
               notes TEXT,
               status TEXT NOT NULL DEFAULT 'Pending',
               created_at INTEGER NOT NULL
@@ -453,7 +487,16 @@ def init_db():
         ensure_column(conn, "orders", "delivery_fee", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(conn, "orders", "transaction_reference", "TEXT")
         ensure_column(conn, "order_items", "size", "TEXT NOT NULL DEFAULT 'Medium'")
+        ensure_column(conn, "order_items", "add_ons", "TEXT NOT NULL DEFAULT 'None'")
+        ensure_column(conn, "order_items", "add_ons_total", "INTEGER NOT NULL DEFAULT 0")
+        ensure_column(conn, "products", "out_of_stock", "INTEGER NOT NULL DEFAULT 0")
+        ensure_column(conn, "stock_requests", "order_id", "INTEGER REFERENCES orders(id)")
+        ensure_column(conn, "stock_requests", "ordered_quantity", "INTEGER NOT NULL DEFAULT 0")
+        ensure_column(conn, "stock_requests", "available_quantity", "INTEGER NOT NULL DEFAULT 0")
+        ensure_column(conn, "stock_requests", "additional_quantity", "INTEGER NOT NULL DEFAULT 0")
         conn.execute("UPDATE orders SET subtotal = total WHERE subtotal = 0")
+        conn.execute("UPDATE stock_requests SET status = 'Arranged' WHERE status = 'Contacted'")
+        conn.execute("UPDATE stock_requests SET status = 'Completed' WHERE status = 'Closed'")
         if conn.execute("SELECT COUNT(*) FROM products").fetchone()[0] == 0:
             now = int(time.time())
             for item in SEED_PRODUCTS:
@@ -498,6 +541,7 @@ def checkout(payload: CheckoutPayload):
         for item in payload.items:
             if item.size not in SIZE_OPTIONS:
                 raise HTTPException(status_code=400, detail="Choose a valid size.")
+            normalize_add_ons(item.add_ons)
             quantities_by_id[item.product_id] = quantities_by_id.get(item.product_id, 0) + item.quantity
 
         subtotal = 0
@@ -509,15 +553,18 @@ def checkout(payload: CheckoutPayload):
             product = product_row(conn, product_id)
             if not product["active"]:
                 raise HTTPException(status_code=400, detail=f"{product['title']} is not available.")
-            if product["stock"] < quantity:
-                raise HTTPException(status_code=400, detail=f"Only {product['stock']} left for {product['title']}.")
+            if product["out_of_stock"]:
+                raise HTTPException(status_code=400, detail=f"{product['title']} is out of stock.")
             products_by_id[product_id] = product
 
         for item in payload.items:
             product = products_by_id[item.product_id]
-            line_total = product["price"] * item.quantity
+            selected_add_ons = normalize_add_ons(item.add_ons)
+            item_add_ons_total = add_ons_total(selected_add_ons)
+            item_price = product["price"] + item_add_ons_total
+            line_total = item_price * item.quantity
             subtotal += line_total
-            order_items.append((product, item.quantity, item.size, line_total))
+            order_items.append((product, item.quantity, item.size, item_price, add_ons_label(selected_add_ons), item_add_ons_total, line_total))
 
         if subtotal <= 0:
             raise HTTPException(status_code=400, detail="Add at least one product to checkout.")
@@ -550,12 +597,42 @@ def checkout(payload: CheckoutPayload):
             ),
         )
         order_id = cursor.lastrowid
-        for product, quantity, size, line_total in order_items:
+        for product, quantity, size, item_price, item_add_ons, item_add_ons_total, line_total in order_items:
             conn.execute(
-                "INSERT INTO order_items (order_id,product_id,title,size,price,quantity,line_total) VALUES (?,?,?,?,?,?,?)",
-                (order_id, product["id"], product["title"], size, product["price"], quantity, line_total),
+                "INSERT INTO order_items (order_id,product_id,title,size,price,add_ons,add_ons_total,quantity,line_total) VALUES (?,?,?,?,?,?,?,?,?)",
+                (order_id, product["id"], product["title"], size, item_price, item_add_ons, item_add_ons_total, quantity, line_total),
             )
-            conn.execute("UPDATE products SET stock = stock - ?, updated_at = ? WHERE id = ?", (quantity, now, product["id"]))
+
+        for product_id, quantity in quantities_by_id.items():
+            product = products_by_id[product_id]
+            available_quantity = max(0, int(product["stock"] or 0))
+            additional_quantity = max(0, quantity - available_quantity)
+            conn.execute(
+                "UPDATE products SET stock = MAX(stock - ?, 0), updated_at = ? WHERE id = ?",
+                (min(quantity, available_quantity), now, product["id"]),
+            )
+            if additional_quantity > 0:
+                conn.execute(
+                    """
+                    INSERT INTO stock_requests
+                    (product_id,product_title,order_id,customer_name,phone,email,ordered_quantity,available_quantity,additional_quantity,notes,status,created_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                    """,
+                    (
+                        product["id"],
+                        product["title"],
+                        order_id,
+                        payload.customer_name.strip(),
+                        payload.phone.strip(),
+                        payload.email.lower(),
+                        quantity,
+                        available_quantity,
+                        additional_quantity,
+                        (payload.notes or "").strip(),
+                        "Pending",
+                        now,
+                    ),
+                )
         return {
             "id": order_id,
             "order_number": order_number(order_id),
@@ -689,10 +766,10 @@ def create_product(payload: ProductPayload, admin=Depends(require_permission("pr
             index += 1
         cursor = conn.execute(
             """
-            INSERT INTO products (slug,title,summary,description,price,category,stock,image_url,featured,active,created_at,updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+            INSERT INTO products (slug,title,summary,description,price,category,stock,image_url,featured,active,out_of_stock,created_at,updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
-            (slug, payload.title.strip(), payload.summary.strip(), payload.description.strip(), payload.price, payload.category, payload.stock, image_url, int(payload.featured), int(payload.active), now, now),
+            (slug, payload.title.strip(), payload.summary.strip(), payload.description.strip(), payload.price, payload.category, payload.stock, image_url, int(payload.featured), int(payload.active), int(payload.out_of_stock), now, now),
         )
         product_id = cursor.lastrowid
         set_product_images(conn, product_id, [image_url])
@@ -707,10 +784,10 @@ def update_product(product_id: int, payload: ProductPayload, admin=Depends(requi
         next_image_url = storage_image_url(payload.image_url)
         conn.execute(
             """
-            UPDATE products SET title=?,summary=?,description=?,price=?,category=?,stock=?,image_url=?,featured=?,active=?,updated_at=?
+            UPDATE products SET title=?,summary=?,description=?,price=?,category=?,stock=?,image_url=?,featured=?,active=?,out_of_stock=?,updated_at=?
             WHERE id=?
             """,
-            (payload.title.strip(), payload.summary.strip(), payload.description.strip(), payload.price, payload.category, payload.stock, next_image_url, int(payload.featured), int(payload.active), now, product_id),
+            (payload.title.strip(), payload.summary.strip(), payload.description.strip(), payload.price, payload.category, payload.stock, next_image_url, int(payload.featured), int(payload.active), int(payload.out_of_stock), now, product_id),
         )
         if public_asset_url(existing["image_url"]) != public_asset_url(next_image_url):
             set_product_images(conn, product_id, [next_image_url])
@@ -721,7 +798,13 @@ def update_product(product_id: int, payload: ProductPayload, admin=Depends(requi
 def update_stock(product_id: int, payload: StockPayload, admin=Depends(require_permission("inventory:update"))):
     with db() as conn:
         product_row(conn, product_id)
-        conn.execute("UPDATE products SET stock=?, updated_at=? WHERE id=?", (payload.stock, int(time.time()), product_id))
+        if payload.out_of_stock is None:
+            conn.execute("UPDATE products SET stock=?, updated_at=? WHERE id=?", (payload.stock, int(time.time()), product_id))
+        else:
+            conn.execute(
+                "UPDATE products SET stock=?, out_of_stock=?, updated_at=? WHERE id=?",
+                (payload.stock, int(payload.out_of_stock), int(time.time()), product_id),
+            )
         return serialize_product(product_row(conn, product_id), conn)
 
 
@@ -805,7 +888,10 @@ def update_payment_status(order_id: int, payload: PaymentStatusPayload, admin=De
 @app.get("/api/admin/stock-requests")
 def admin_stock_requests(admin=Depends(require_permission("orders:view"))):
     with db() as conn:
-        return rows_dict(conn.execute("SELECT * FROM stock_requests ORDER BY created_at DESC").fetchall())
+        requests = rows_dict(conn.execute("SELECT * FROM stock_requests ORDER BY created_at DESC").fetchall())
+        for item in requests:
+            item["order_number"] = order_number(item["order_id"]) if item.get("order_id") else None
+        return requests
 
 
 @app.patch("/api/admin/stock-requests/{request_id}/status")

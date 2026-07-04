@@ -34,6 +34,13 @@ function escapeHtml(value) {
   return String(value || "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" }[char]));
 }
 
+function orderAddOnsText(order) {
+  const addOns = (order.items || [])
+    .map((item) => item.add_ons || "None")
+    .filter((value) => value && value !== "None");
+  return addOns.length ? [...new Set(addOns)].map(escapeHtml).join("<br>") : "None";
+}
+
 function showNotice(message, ok = false) {
   const notice = document.querySelector("#notice");
   if (!notice) return;
@@ -143,13 +150,13 @@ function renderProducts() {
 function renderInventory() {
   const tbody = document.querySelector("#inventoryTable");
   tbody.innerHTML = products.map((product) => {
-    const status = product.stock === 0 ? ["Out of stock", "status-out"] : product.stock <= 5 ? ["Low stock", "status-low"] : ["In stock", "status-ok"];
+    const status = product.out_of_stock ? ["Out of stock", "status-out"] : product.stock <= 5 ? ["Low stock", "status-low"] : ["Available", "status-ok"];
     return `
       <tr>
         <td><strong>${escapeHtml(product.title)}</strong><small>${escapeHtml(label(product.category))}</small></td>
         <td>${Number(product.stock || 0)}</td>
         <td class="${status[1]}">${status[0]}</td>
-        <td><div class="actions"><input class="stock-input" type="number" min="0" value="${Number(product.stock || 0)}" data-stock-input="${Number(product.id)}"><button data-stock="${Number(product.id)}" ${can("inventory:update") ? "" : "disabled"}>Save</button></div></td>
+        <td><div class="actions"><input class="stock-input" type="number" min="0" value="${Number(product.stock || 0)}" data-stock-input="${Number(product.id)}"><label class="check"><input type="checkbox" data-out-stock-input="${Number(product.id)}" ${product.out_of_stock ? "checked" : ""}> Out of stock</label><button data-stock="${Number(product.id)}" ${can("inventory:update") ? "" : "disabled"}>Save</button></div></td>
       </tr>
     `;
   }).join("");
@@ -199,6 +206,7 @@ function editProduct(id) {
   setProductImageSlots(form, product);
   fields.featured.checked = Boolean(product.featured);
   fields.active.checked = Boolean(product.active);
+  fields.out_of_stock.checked = Boolean(product.out_of_stock);
   document.querySelector("#productFormTitle").textContent = "Edit Product";
 }
 
@@ -216,7 +224,8 @@ async function saveProduct(event) {
     description: fields.description.value.trim(),
     image_url: fields.image_url.value.trim(),
     featured: fields.featured.checked,
-    active: fields.active.checked
+    active: fields.active.checked,
+    out_of_stock: fields.out_of_stock.checked
   };
   const imageInputs = [...form.querySelectorAll("[data-product-image-input]")];
   const imageFiles = imageInputs
@@ -255,6 +264,7 @@ function resetProductForm() {
   form.reset();
   form.elements.id.value = "";
   form.elements.active.checked = true;
+  form.elements.out_of_stock.checked = false;
   clearProductImageSlots(form);
   document.querySelector("#productFormTitle").textContent = "Add Product";
 }
@@ -268,7 +278,8 @@ async function deleteProduct(id) {
 
 async function updateStock(id) {
   const input = document.querySelector(`[data-stock-input="${id}"]`);
-  await request(`/api/admin/products/${id}/stock`, { method: "PATCH", body: JSON.stringify({ stock: Number(input.value) }) });
+  const outOfStockInput = document.querySelector(`[data-out-stock-input="${id}"]`);
+  await request(`/api/admin/products/${id}/stock`, { method: "PATCH", body: JSON.stringify({ stock: Number(input.value), out_of_stock: Boolean(outOfStockInput?.checked) }) });
   await loadProducts();
   showNotice("Stock updated.", true);
 }
@@ -311,6 +322,7 @@ function renderOrders() {
       <td><strong>${escapeHtml(order.order_number || `MEMO-${String(order.id).padStart(5, "0")}`)}</strong><small>#${Number(order.id)}</small></td>
       <td><strong>${escapeHtml(order.customer_name)}</strong><small>${escapeHtml(order.phone)}<br>${escapeHtml(order.email)}<br>${escapeHtml(order.address)}, ${escapeHtml(order.city)}${order.notes ? `<br>Notes: ${escapeHtml(order.notes)}` : ""}</small></td>
       <td>${order.items.map((item) => `${escapeHtml(item.title)}<small>Size: ${escapeHtml(item.size || "Medium")} · Qty: ${Number(item.quantity || 0)}</small>`).join("")}</td>
+      <td>${orderAddOnsText(order)}</td>
       <td>${money(order.total)}<small>Subtotal ${money(order.subtotal || order.total)}<br>Delivery ${money(order.delivery_fee || 0)}</small></td>
       <td>${escapeHtml(order.payment_method)}</td>
       <td><select class="status-select" data-payment-status="${Number(order.id)}" ${can("orders:update") ? "" : "disabled"}>
@@ -349,15 +361,20 @@ function renderStockRequests() {
   tbody.innerHTML = stockRequests.length ? stockRequests.map((item) => `
     <tr>
       <td>#${Number(item.id)}</td>
-      <td><strong>${escapeHtml(item.product_title)}</strong><small>Product #${Number(item.product_id)}</small></td>
+      <td>${item.order_id ? `<strong>${escapeHtml(item.order_number || `MEMO-${String(item.order_id).padStart(5, "0")}`)}</strong><small>#${Number(item.order_id)}</small>` : "<small>Manual product request</small>"}</td>
+      <td><strong>${escapeHtml(item.product_title)}</strong><small>Product ID/SKU #${Number(item.product_id)}</small></td>
       <td><strong>${escapeHtml(item.customer_name)}</strong><small>${escapeHtml(item.phone)}<br>${escapeHtml(item.email)}</small></td>
+      <td>
+        <strong>Ordered: ${Number(item.ordered_quantity || 0)}</strong>
+        <small>Available: ${Number(item.available_quantity || 0)}<br>Additional required: ${Number(item.additional_quantity || 0)}</small>
+      </td>
       <td>${escapeHtml(item.notes || "")}</td>
       <td><select class="status-select" data-request-status="${Number(item.id)}" ${can("orders:update") ? "" : "disabled"}>
-        ${["Pending", "Contacted", "Closed"].map((status) => `<option ${status === item.status ? "selected" : ""}>${status}</option>`).join("")}
+        ${["Pending", "Arranged", "Completed", "Cancelled"].map((status) => `<option ${status === item.status ? "selected" : ""}>${status}</option>`).join("")}
       </select></td>
       <td>${dateText(item.created_at)}</td>
     </tr>
-  `).join("") : `<tr><td colspan="6">No item requests yet.</td></tr>`;
+  `).join("") : `<tr><td colspan="8">No inventory requests yet.</td></tr>`;
   tbody.querySelectorAll("[data-request-status]").forEach((select) => select.addEventListener("change", () => updateStockRequestStatus(Number(select.dataset.requestStatus), select.value)));
 }
 
@@ -392,7 +409,7 @@ function renderDashboard() {
   document.querySelector("#dashboardStats").innerHTML = [
     ["Products", products.length],
     ["Orders", orders.length],
-    ["Requests", stockRequests.filter((item) => item.status !== "Closed").length],
+    ["Requests", stockRequests.filter((item) => !["Completed", "Cancelled"].includes(item.status)).length],
     ["Revenue", money(totalSales)],
     ["Pending orders", pendingOrders]
   ].map(statCard).join("");
