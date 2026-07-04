@@ -189,7 +189,31 @@ export default function ProductDetailPage({ product, products, currency, navigat
 
           <p className="cart-message" aria-live="polite">{requestMessage || message}</p>
 
-          <p className="product-detail-description">{product.description}</p>
+          <div className="product-info-accordions">
+            <details>
+              <summary>Product Details</summary>
+              <p>{product.description}</p>
+            </details>
+            <details>
+              <summary>Care Instructions</summary>
+              <ul>
+                <li>Each product of ours is designed with highest quality standards and delicacy.</li>
+                <li>Handle with care.</li>
+                <li>Dry clean only.</li>
+              </ul>
+            </details>
+            <details>
+              <summary>Disclaimer</summary>
+              <p>The fabric pattern/laces may vary.</p>
+              <p>Length will vary according to the design.</p>
+              <p>Actual colors of the outfit may vary from the colors being displayed on your device.</p>
+              <p>There may be a tolerance of +/- 1 inches, due to the handmade nature of our garments.</p>
+            </details>
+            <details>
+              <summary>Custom Size</summary>
+              <p>Message your custom measurements on Instagram page.</p>
+            </details>
+          </div>
 
           {stockRequestOpen && (
             <form className="stock-request-form" id="stockRequestForm" onSubmit={submitStockRequest}>

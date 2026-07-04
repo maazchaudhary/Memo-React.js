@@ -688,7 +688,13 @@ def products(category: str | None = None, featured: bool | None = None):
     if featured is not None:
         query += " AND featured = ?"
         params.append(1 if featured else 0)
-    query += " ORDER BY created_at DESC, id DESC"
+    query += """
+      ORDER BY
+        CASE WHEN id > 11 THEN 0 ELSE 1 END ASC,
+        CASE WHEN id > 11 THEN created_at ELSE 0 END DESC,
+        CASE WHEN id > 11 THEN id ELSE 0 END DESC,
+        id ASC
+    """
     with db() as conn:
         return serialize_products(conn.execute(query, params).fetchall(), conn)
 

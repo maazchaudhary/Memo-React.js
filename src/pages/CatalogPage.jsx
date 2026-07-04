@@ -3,10 +3,24 @@ import { seedProducts } from "../data/products";
 import Link from "../components/Link";
 import ProductCard from "../components/ProductCard";
 
+const originalProductCount = 11;
+
 export default function CatalogPage({ path, products, currency, navigate }) {
   const page = categoryPages[path] || categoryPages["/new-arrivals"];
   const filtered = page.category ? products.filter((product) => product.category === page.category) : products;
-  const visible = filtered.length ? filtered : seedProducts.filter((product) => !page.category || product.category === page.category).slice(0, 4);
+  const sortProducts = (items) =>
+    [...items].sort((a, b) => {
+      const aId = Number(a.id || 0);
+      const bId = Number(b.id || 0);
+      const aIsNew = aId > originalProductCount;
+      const bIsNew = bId > originalProductCount;
+
+      if (aIsNew !== bIsNew) return aIsNew ? -1 : 1;
+      return aIsNew ? bId - aId : aId - bId;
+    });
+  const visible = sortProducts(
+    filtered.length ? filtered : seedProducts.filter((product) => !page.category || product.category === page.category).slice(0, 4)
+  );
 
   return (
     <main className="catalog-page">

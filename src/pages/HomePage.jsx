@@ -12,6 +12,7 @@ export default function HomePage({ products, currency, navigate }) {
     seedProducts.find((product) => product.title === title) ||
     seedProducts.find((product) => String(product.image_url || "").includes(image));
   const storyProduct = findProduct("Sunlit Memo", "IMG_1355.jpg");
+  const socialImages = ["IMG_9828.jpg", "IMG_8821.jpg", "IMG_7990.jpg", "IMG_0445.jpg", "IMG_1355.jpg"];
 
   return (
     <main>
@@ -64,10 +65,17 @@ export default function HomePage({ products, currency, navigate }) {
       <section className="social" id="social">
         <p className="eyebrow">Seen and loved</p>
         <h2>@memobymiraal</h2>
-        <div>
-          {["IMG_9828.jpg", "IMG_8821.jpg", "IMG_7990.jpg", "IMG_0445.jpg", "IMG_1355.jpg"].map((image) => (
-            <img key={image} src={`/assets/photos/${image}`} alt="Memo by Miraal look" />
-          ))}
+        <div className="social-track">
+          <div className="social-set">
+            {socialImages.map((image) => (
+              <img key={image} src={`/assets/photos/${image}`} alt="Memo by Miraal look" />
+            ))}
+          </div>
+          <div className="social-set social-set-duplicate" aria-hidden="true">
+            {socialImages.map((image) => (
+              <img key={`duplicate-${image}`} src={`/assets/photos/${image}`} alt="" />
+            ))}
+          </div>
         </div>
       </section>
     </main>

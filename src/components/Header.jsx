@@ -5,7 +5,7 @@ import Link from "./Link";
 
 export default function Header({ navigate, menuOpen, setMenuOpen, cartQuantity, currency, setCurrency, openCart }) {
   return <>
-    <a className="hotline" href="#newsletter">A note from our studio - Join the Memo community</a>
+    <a className="hotline" href="https://www.instagram.com/memobymiraal/" target="_blank"   rel="noopener noreferrer" >A note from our studio - Join the Memo community</a>
     <header className="header">
       <button className="menu-trigger" id="menuButton" aria-label="Open menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)}><i></i><i></i><span>Menu</span></button>
       <Link className="logo" to="/" navigate={navigate} aria-label="Memo home"><img src="/assets/memo-logo.png" alt="Memo" /></Link>
