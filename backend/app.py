@@ -87,20 +87,164 @@ ROLE_PERMISSIONS = {
 }
 
 SEED_PRODUCTS = [
-    ("Dove Purple", "Silk shirt with embroidered details", "A graceful silk ensemble finished with delicate embroidery and an easy, flowing silhouette.", 25000, "the-silk-edit", 14, "assets/photos/img_7289.jpg", 1),
-    ("Celine", "Pastel embroidered long shirt", "A fresh pastel shirt with intricate embroidery, designed for effortless day-to-evening dressing.", 16000, "everyday-memo", 19, "assets/photos/img_9828.jpg", 1),
-    ("Rose Garden", "Embroidered occasion ensemble", "A refined occasion ensemble featuring floral embroidery and a softly structured drape.", 16000, "occasion-wear", 8, "assets/photos/img_4089.jpg", 1),
-    ("Passu", "Botanical sage silk dress", "A botanical sage silk dress with tonal detailing and a relaxed, elegant finish.", 16000, "the-silk-edit", 11, "assets/photos/img_4140.jpg", 1),
-    ("Bloom", "Easy elegance silk dress", "A soft floral silk dress with delicate movement and refined everyday polish.", 16000, "the-silk-edit", 7, "assets/photos/img_1524.jpg", 0),
-    ("Sapphire", "Embroidered silk kaftan", "A pale yellow kaftan with luminous embroidery and an airy, occasion-ready cut.", 23000, "the-silk-edit", 5, "assets/photos/img_1355.jpg", 0),
-    ("Amaya", "Quiet colour embroidered set", "A quiet pastel outfit made for warm days, garden lunches, and relaxed celebrations.", 16000, "everyday-memo", 16, "assets/photos/img_9820.jpg", 0),
-    ("Kaira", "Fresh embroidered dress", "A polished daywear dress with fresh embroidery and a gently structured shape.", 16000, "everyday-memo", 9, "assets/photos/img_8818.jpg", 0),
-    ("Dusk", "Soft festive dress", "A dusk-pink look balancing softness, festive detail, and everyday ease.", 16000, "everyday-memo", 4, "assets/photos/img_0445.jpg", 0),
-    ("Lira Greens", "Embroidered evening notes", "An evening green ensemble with polished embroidery and a graceful drape.", 16000, "occasion-wear", 6, "assets/photos/img_7990.jpg", 0),
-    ("Lira Pink", "Occasion embroidered dress", "A pink embroidered look with a celebratory silhouette and intricate detailing.", 16000, "occasion-wear", 3, "assets/photos/img_5142.jpg", 0),
-    ("Raya", "Formal embroidered ensemble", "A formal Raya ensemble made with detailed embroidery and a graceful festive profile.", 16000, "occasion-wear", 2, "assets/photos/img_4715.jpg", 0),
-    
-    ]
+    {
+        "title": "Dusk",
+        "summary": "Silk shirt with embroidered details",
+        "description": "This tea pink kaftan-style shirt features elegant embroidery that adds a graceful touch to it's timeless silhouette. Designed for effortless style.",
+        "price": 16000,
+        "category": "all-products",
+        "stock": 14,
+        "images": [
+            "assets/photos/IMG_0445.jpg",
+            "assets/photos/IMG_0441.jpg",
+            "assets/photos/SizeChart/IMG_7611.png",
+        ],
+        "featured": 1,
+    },
+    {
+        "title": "Bloom",
+        "summary": "Pastel embroidered long shirt",
+        "description": "A beautiful statement neckline. Soft ivory and blue embroidery with delicate cutwork adds elegance to the design, while subtle appliqués and a lace border create a graceful finish. A timeless outfit, perfect for any occasion.",
+        "price": 16000,
+        "category": "all-products",
+        "stock": 19,
+        "images": [
+            "assets/photos/IMG_1524.jpg",
+            "assets/photos/IMG_1526.jpg",
+            "assets/photos/SizeChart/IMG_7611.png",
+        ],
+        "featured": 1,
+    },
+    {
+        "title": "Amaya",
+        "summary": "Embroidered occasion ensemble",
+        "description": "Kaftan-style shirt made on pure silk adorned with elegant thread embroidery. Its effortless silhouette and timeless detailing make it a versatile addition to any wardrobe.",
+        "price": 16000,
+        "category": "all-products",
+        "stock": 8,
+        "images": [
+            "assets/photos/IMG_9818.jpg",
+            "assets/photos/IMG_9820.jpg",
+            "assets/photos/SizeChart/IMG_7611.png",
+        ],
+        "featured": 1,
+    },
+    {
+        "title": "Kaira",
+        "summary": "Botanical sage silk dress",
+        "description": "Kaira featuring intricate Ari embroidery on the front and back. Pearl work on the sleeves, lace on daman & side slits and pearl tassels on the neckline. Perfect for festive occasions and celebrations. Note: Sleeves lining can be added upon request.",
+        "price": 16000,
+        "category": "all-products",
+        "stock": 11,
+        "images": [
+            "assets/photos/IMG_8821.jpg",
+            "assets/photos/IMG_8820.jpg",
+            "assets/photos/IMG_1472.jpg",
+            "assets/photos/SizeChart/IMG_6466.png",
+        ],
+        "featured": 1,
+    },
+    {
+        "title": "Celine",
+        "summary": "Easy elegance silk dress",
+        "description": "Mint green kaftan-style shirt featuring intricate appliqué work with vibrant embroidery. Finished with floral tassels on the neckline, adding a graceful and elegant touch to the design.",
+        "price": 16000,
+        "category": "all-products",
+        "stock": 7,
+        "images": [
+            "assets/photos/IMG_9828.jpg",
+            "assets/photos/IMG_9838.jpg",
+            "assets/photos/IMG_9840.jpg",
+            "assets/photos/SizeChart/IMG_7611.png",
+        ],
+        "featured": 0,
+    },
+    {
+        "title": "Sapphire",
+        "summary": "Embroidered silk kaftan",
+        "description": "Butter yellow kaftan-style shirt featuring intricate appliqué work with vibrant embroidery. Finished with floral tassels on the neckline, adding a graceful and elegant touch to the design.",
+        "price": 23000,
+        "category": "all-products",
+        "stock": 5,
+        "images": [
+            "assets/photos/IMG_1355.jpg",
+            "assets/photos/SizeChart/IMG_7611.png",
+        ],
+        "featured": 0,
+    },
+    {
+        "title": "Lira Green",
+        "summary": "Quiet colour embroidered set",
+        "description": "Adorned with 3d embroidery, handwork, and pearl accents on butter silk fabric.",
+        "price": 16000,
+        "category": "all-products",
+        "stock": 16,
+        "images": [
+            "assets/photos/IMG_7990.jpg",
+            "assets/photos/IMG_7992.jpg",
+            "assets/photos/SizeChart/IMG_7611.png",
+        ],
+        "featured": 0,
+    },
+    {
+        "title": "Lira Pink",
+        "summary": "Fresh embroidered dress",
+        "description": "Adorned with 3d embroidery, handwork, and pearl accents on butter silk fabric.",
+        "price": 16000,
+        "category": "all-products",
+        "stock": 9,
+        "images": [
+            "assets/photos/IMG_5143.jpg",
+            "assets/photos/IMG_5142.jpg",
+            "assets/photos/SizeChart/IMG_7611.png",
+        ],
+        "featured": 0,
+    },
+    {
+        "title": "Raya",
+        "summary": "Soft festive dress",
+        "description": "Kaftan style shirt featuring intricate multicolor thread embroidery across the shirt and sleeves. Designed for effortless styling, it’s a versatile piece that’s perfect for casual outings and semi-formal occasions.",
+        "price": 16000,
+        "category": "all-products",
+        "stock": 4,
+        "images": [
+            "assets/photos/IMG_4715.jpg",
+            "assets/photos/IMG_4716.jpg",
+            "assets/photos/IMG_4718.jpg",
+            "assets/photos/IMG_4753.jpg",
+            "assets/photos/SizeChart/IMG_7611.png",
+        ],
+        "featured": 0,
+    },
+    {
+        "title": "Dove Blue",
+        "summary": "Embroidered evening notes",
+        "description": "Three-piece ensemble featuring an embroidered shirt paired with flared pants. The pants can be customized to culottes or balloon pants and the look is completed with a three-yard medium silk dupatta adorned with appliqué embroidery on all four corners.",
+        "price": 25000,
+        "category": "all-products",
+        "stock": 6,
+        "images": [
+            "assets/photos/IMG_7747.jpg",
+            "assets/photos/IMG_7750.jpg",
+            "assets/photos/SizeChart/IMG_6466.png",
+        ],
+        "featured": 0,
+    },
+    {
+        "title": "Dove Lilac",
+        "summary": "Occasion embroidered dress",
+        "description": "Three-piece ensemble featuring an embroidered shirt paired with flared pants. The pants can be customized to culottes or balloon pants and the look is completed with a three-yard medium silk dupatta adorned with appliqué embroidery on all four corners.",
+        "price": 25000,
+        "category": "all-products",
+        "stock": 3,
+        "images": [
+            "assets/photos/IMG_7289.jpg",
+            "assets/photos/IMG_7276.jpg",
+            "assets/photos/SizeChart/IMG_6466.png",
+        ],
+        "featured": 0,
+    },
+]
 
 
 class AdminCreate(BaseModel):
@@ -499,21 +643,39 @@ def init_db():
         conn.execute("UPDATE stock_requests SET status = 'Completed' WHERE status = 'Closed'")
         if conn.execute("SELECT COUNT(*) FROM products").fetchone()[0] == 0:
             now = int(time.time())
+
             for item in SEED_PRODUCTS:
-                slug = slugify(item[0])
-                conn.execute(
-                    """
-                    INSERT INTO products (slug,title,summary,description,price,category,stock,image_url,featured,active,created_at,updated_at)
-                    VALUES (?,?,?,?,?,?,?,?,?,1,?,?)
-                    """,
-                    (slug, *item, now, now),
-                )
-        for product in conn.execute("SELECT id,image_url,created_at FROM products").fetchall():
-            if not conn.execute("SELECT id FROM product_images WHERE product_id = ? LIMIT 1", (product["id"],)).fetchone():
-                conn.execute(
-                    "INSERT INTO product_images (product_id,image_url,sort_order,created_at) VALUES (?,?,0,?)",
-                    (product["id"], product["image_url"], product["created_at"]),
-                )
+                images = item.get("images") or [item.get("image_url")]
+                images = [image for image in images if image]
+                main_image = images[0] if images else "assets/photos/img_9828.jpg"
+
+                cursor = conn.execute(
+                """
+                INSERT INTO products (slug,title,summary,description,price,category,stock,image_url,featured,active,created_at,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,1,?,?)
+                """,
+                (
+                    slugify(item["title"]),
+                    item["title"],
+                    item["summary"],
+                    item["description"],
+                    item["price"],
+                    item["category"],
+                    item["stock"],
+                    main_image,
+                    item["featured"],
+                    now,
+                    now,
+                ),
+        )
+
+                product_id = cursor.lastrowid
+
+                for index, image_url in enumerate(images[:5]):
+                    conn.execute(
+                        "INSERT INTO product_images (product_id,image_url,sort_order,created_at) VALUES (?,?,?,?)",
+                        (product_id, image_url, index, now),
+                    )
 
 
 @app.get("/api/products")
