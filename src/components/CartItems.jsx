@@ -8,7 +8,7 @@ export default function CartItems({ cart, currency, updateSize, removeItem }) {
     <div className="cart-items">
       {cart.length ? cart.map((item) => {
         const itemKey = item.key || cartItemKey(item.product_id, item.size, item.add_ons);
-        const selectedSize = item.size || "Medium";
+        const selectedSize = item.size || "M";
         const addOnsText = addOnsLabel(item.add_ons);
 
         return (

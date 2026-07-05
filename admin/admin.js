@@ -133,7 +133,7 @@ function renderProducts() {
   const tbody = document.querySelector("#productsTable");
   tbody.innerHTML = products.map((product) => `
     <tr>
-      <td><strong>${escapeHtml(product.title)}</strong><small>${escapeHtml(product.summary)}</small></td>
+      <td><strong>${escapeHtml(product.title)}</strong></td>
       <td>${escapeHtml(label(product.category))}<small>${product.active ? "Visible" : "Hidden"}</small></td>
       <td>${money(product.price)}</td>
       <td>${Number(product.stock || 0)}</td>
@@ -200,7 +200,6 @@ function editProduct(id) {
   fields.price.value = product.price;
   fields.category.value = product.category;
   fields.stock.value = product.stock;
-  fields.summary.value = product.summary;
   fields.description.value = product.description;
   fields.image_url.value = product.image_url;
   setProductImageSlots(form, product);
@@ -220,7 +219,6 @@ async function saveProduct(event) {
     price: Number(fields.price.value),
     category: fields.category.value,
     stock: Number(fields.stock.value),
-    summary: fields.summary.value.trim(),
     description: fields.description.value.trim(),
     image_url: fields.image_url.value.trim(),
     featured: fields.featured.checked,
@@ -321,7 +319,7 @@ function renderOrders() {
     <tr>
       <td><strong>${escapeHtml(order.order_number || `MEMO-${String(order.id).padStart(5, "0")}`)}</strong><small>#${Number(order.id)}</small></td>
       <td><strong>${escapeHtml(order.customer_name)}</strong><small>${escapeHtml(order.phone)}<br>${escapeHtml(order.email)}<br>${escapeHtml(order.address)}, ${escapeHtml(order.city)}${order.notes ? `<br>Notes: ${escapeHtml(order.notes)}` : ""}</small></td>
-      <td>${order.items.map((item) => `${escapeHtml(item.title)}<small>Size: ${escapeHtml(item.size || "Medium")} · Qty: ${Number(item.quantity || 0)}</small>`).join("")}</td>
+      <td>${order.items.map((item) => `${escapeHtml(item.title)}<small>Size: ${escapeHtml(item.size || "M")} · Qty: ${Number(item.quantity || 0)}</small>`).join("")}</td>
       <td>${orderAddOnsText(order)}</td>
       <td>${money(order.total)}<small>Subtotal ${money(order.subtotal || order.total)}<br>Delivery ${money(order.delivery_fee || 0)}</small></td>
       <td>${escapeHtml(order.payment_method)}</td>

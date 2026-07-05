@@ -8,7 +8,7 @@ export default function OrderSummary({ cart, totals, currency, compact = false }
       <div className="summary-items">
         {cart.length ? cart.map((item) => (
           <div className="summary-row" key={item.key || cartItemKey(item.product_id, item.size, item.add_ons)}>
-            <span>{item.title} ({item.size || "Medium"}) x {item.quantity}<small>Add-ons: {addOnsLabel(item.add_ons)}</small></span>
+            <span>{item.title} ({item.size || "M"}) x {item.quantity}<small>Add-ons: {addOnsLabel(item.add_ons)}</small></span>
             <strong>{money(item.price * item.quantity, currency)}</strong>
           </div>
         )) : <p className="empty-state">Your bag is empty.</p>}

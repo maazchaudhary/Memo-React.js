@@ -12,7 +12,7 @@ export default function HomePage({ products, currency, navigate }) {
     seedProducts.find((product) => product.title === title) ||
     seedProducts.find((product) => String(product.image_url || "").includes(image));
   const storyProduct = findProduct("Sunlit Memo", "IMG_1355.jpg");
-  const socialImages = ["IMG_9828.jpg", "IMG_8821.jpg", "IMG_7990.jpg", "IMG_0445.jpg", "IMG_1355.jpg"];
+  const socialImages = ["IMG_8446.jpg", "IMG_1090.jpg", "IMG_7990.jpg", "IMG_1924.jpg", "IMG_0814.jpg"];
 
   return (
     <main>
@@ -90,10 +90,10 @@ function TopPicks({ products, navigate }) {
   return (
     <section className="top-picks" id="top-picks">
       <p className="eyebrow">A wardrobe in bloom</p>
-      <h2>Notes for the Season</h2>
+      <h2>SEASON'S TOP PICKS</h2>
       <div className="pick-grid">
         {[
-          ["IMG_7990.jpg", "Lira green evening outfit", "Evening notes", "Lira Green"],
+          ["IMG_2453.jpg", "Kaira Pink evening outfit", "Evening notes", "Kaira Pink"],
           ["IMG_9820.jpg", "Amaya embroidered outfit", "Quiet colour", "Amaya"],
           ["IMG_1524.jpg", "Bloom silk dress", "Easy elegance", "Bloom"]
         ].map(([image, alt, small, label]) => (

@@ -64,7 +64,7 @@ SPA_ROUTES = {
 DELIVERY_FEE = int(os.getenv("MEMO_DELIVERY_FEE", "250"))
 PAYMENT_METHODS = {"Cash on Delivery", "Bank Transfer", "EasyPaisa / JazzCash"}
 MANUAL_PAYMENT_METHODS = {"Bank Transfer", "EasyPaisa / JazzCash"}
-SIZE_OPTIONS = {"Extra Small", "Small", "Medium", "Large", "Custom"}
+SIZE_OPTIONS = {"XS", "S", "M", "L", "XL", "Custom"}
 ADD_ON_OPTIONS = {
     "pants": {"label": "Pants", "price": 4500},
     "dupatta": {"label": "Dupatta", "price": 3500},
@@ -89,7 +89,6 @@ ROLE_PERMISSIONS = {
 SEED_PRODUCTS = [
     {
         "title": "Dusk",
-        "summary": "Silk shirt with embroidered details",
         "description": "This tea pink kaftan-style shirt features elegant embroidery that adds a graceful touch to it's timeless silhouette. Designed for effortless style.",
         "price": 16000,
         "category": "all-products",
@@ -103,7 +102,6 @@ SEED_PRODUCTS = [
     },
     {
         "title": "Bloom",
-        "summary": "Pastel embroidered long shirt",
         "description": "A beautiful statement neckline. Soft ivory and blue embroidery with delicate cutwork adds elegance to the design, while subtle appliqués and a lace border create a graceful finish. A timeless outfit, perfect for any occasion.",
         "price": 16000,
         "category": "all-products",
@@ -117,7 +115,6 @@ SEED_PRODUCTS = [
     },
     {
         "title": "Amaya",
-        "summary": "Embroidered occasion ensemble",
         "description": "Kaftan-style shirt made on pure silk adorned with elegant thread embroidery. Its effortless silhouette and timeless detailing make it a versatile addition to any wardrobe.",
         "price": 16000,
         "category": "all-products",
@@ -131,7 +128,6 @@ SEED_PRODUCTS = [
     },
     {
         "title": "Kaira",
-        "summary": "Botanical sage silk dress",
         "description": "Kaira featuring intricate Ari embroidery on the front and back. Pearl work on the sleeves, lace on daman & side slits and pearl tassels on the neckline. Perfect for festive occasions and celebrations. Note: Sleeves lining can be added upon request.",
         "price": 16000,
         "category": "all-products",
@@ -146,7 +142,6 @@ SEED_PRODUCTS = [
     },
     {
         "title": "Celine",
-        "summary": "Easy elegance silk dress",
         "description": "Mint green kaftan-style shirt featuring intricate appliqué work with vibrant embroidery. Finished with floral tassels on the neckline, adding a graceful and elegant touch to the design.",
         "price": 16000,
         "category": "all-products",
@@ -161,7 +156,6 @@ SEED_PRODUCTS = [
     },
     {
         "title": "Sapphire",
-        "summary": "Embroidered silk kaftan",
         "description": "Butter yellow kaftan-style shirt featuring intricate appliqué work with vibrant embroidery. Finished with floral tassels on the neckline, adding a graceful and elegant touch to the design.",
         "price": 23000,
         "category": "all-products",
@@ -174,7 +168,6 @@ SEED_PRODUCTS = [
     },
     {
         "title": "Lira Green",
-        "summary": "Quiet colour embroidered set",
         "description": "Adorned with 3d embroidery, handwork, and pearl accents on butter silk fabric.",
         "price": 16000,
         "category": "all-products",
@@ -188,7 +181,6 @@ SEED_PRODUCTS = [
     },
     {
         "title": "Lira Pink",
-        "summary": "Fresh embroidered dress",
         "description": "Adorned with 3d embroidery, handwork, and pearl accents on butter silk fabric.",
         "price": 16000,
         "category": "all-products",
@@ -202,7 +194,6 @@ SEED_PRODUCTS = [
     },
     {
         "title": "Raya",
-        "summary": "Soft festive dress",
         "description": "Kaftan style shirt featuring intricate multicolor thread embroidery across the shirt and sleeves. Designed for effortless styling, it’s a versatile piece that’s perfect for casual outings and semi-formal occasions.",
         "price": 16000,
         "category": "all-products",
@@ -218,7 +209,6 @@ SEED_PRODUCTS = [
     },
     {
         "title": "Dove Blue",
-        "summary": "Embroidered evening notes",
         "description": "Three-piece ensemble featuring an embroidered shirt paired with flared pants. The pants can be customized to culottes or balloon pants and the look is completed with a three-yard medium silk dupatta adorned with appliqué embroidery on all four corners.",
         "price": 25000,
         "category": "all-products",
@@ -232,7 +222,6 @@ SEED_PRODUCTS = [
     },
     {
         "title": "Dove Lilac",
-        "summary": "Occasion embroidered dress",
         "description": "Three-piece ensemble featuring an embroidered shirt paired with flared pants. The pants can be customized to culottes or balloon pants and the look is completed with a three-yard medium silk dupatta adorned with appliqué embroidery on all four corners.",
         "price": 25000,
         "category": "all-products",
@@ -270,7 +259,6 @@ class PasswordResetPayload(BaseModel):
 
 class ProductPayload(BaseModel):
     title: str = Field(min_length=2, max_length=120)
-    summary: str = Field(min_length=2, max_length=180)
     description: str = Field(min_length=2, max_length=1200)
     price: int = Field(ge=0)
     category: str = Field(min_length=2, max_length=80)
@@ -289,7 +277,7 @@ class StockPayload(BaseModel):
 class OrderItemPayload(BaseModel):
     product_id: int
     quantity: int = Field(ge=1, le=99)
-    size: str = Field(default="Medium", min_length=2, max_length=40)
+    size: str = Field(default="M", min_length=1, max_length=40)
     add_ons: list[str] = Field(default_factory=list, max_length=2)
 
 
@@ -386,6 +374,7 @@ def set_product_images(conn: sqlite3.Connection, product_id: int, image_urls: li
 def serialize_product(row: sqlite3.Row | None, conn: sqlite3.Connection | None = None):
     product = row_dict(row)
     if product and "image_url" in product:
+        product.pop("summary", None)
         product["image_url"] = public_asset_url(product["image_url"])
         images = product_images(conn, product["id"], product["image_url"]) if conn else [product["image_url"]]
         product["images"] = images
@@ -561,7 +550,7 @@ def init_db():
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               slug TEXT NOT NULL UNIQUE,
               title TEXT NOT NULL,
-              summary TEXT NOT NULL,
+              summary TEXT NOT NULL DEFAULT '',
               description TEXT NOT NULL,
               price INTEGER NOT NULL CHECK(price >= 0),
               category TEXT NOT NULL,
@@ -603,7 +592,7 @@ def init_db():
               order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
               product_id INTEGER NOT NULL REFERENCES products(id),
               title TEXT NOT NULL,
-              size TEXT NOT NULL DEFAULT 'Medium',
+              size TEXT NOT NULL DEFAULT 'M',
               price INTEGER NOT NULL,
               add_ons TEXT NOT NULL DEFAULT 'None',
               add_ons_total INTEGER NOT NULL DEFAULT 0,
@@ -630,7 +619,7 @@ def init_db():
         ensure_column(conn, "orders", "subtotal", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(conn, "orders", "delivery_fee", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(conn, "orders", "transaction_reference", "TEXT")
-        ensure_column(conn, "order_items", "size", "TEXT NOT NULL DEFAULT 'Medium'")
+        ensure_column(conn, "order_items", "size", "TEXT NOT NULL DEFAULT 'M'")
         ensure_column(conn, "order_items", "add_ons", "TEXT NOT NULL DEFAULT 'None'")
         ensure_column(conn, "order_items", "add_ons_total", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(conn, "products", "out_of_stock", "INTEGER NOT NULL DEFAULT 0")
@@ -651,13 +640,12 @@ def init_db():
 
                 cursor = conn.execute(
                 """
-                INSERT INTO products (slug,title,summary,description,price,category,stock,image_url,featured,active,created_at,updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,1,?,?)
+                INSERT INTO products (slug,title,description,price,category,stock,image_url,featured,active,created_at,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,1,?,?)
                 """,
                 (
                     slugify(item["title"]),
                     item["title"],
-                    item["summary"],
                     item["description"],
                     item["price"],
                     item["category"],
@@ -931,7 +919,7 @@ def create_product(payload: ProductPayload, admin=Depends(require_permission("pr
             INSERT INTO products (slug,title,summary,description,price,category,stock,image_url,featured,active,out_of_stock,created_at,updated_at)
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
-            (slug, payload.title.strip(), payload.summary.strip(), payload.description.strip(), payload.price, payload.category, payload.stock, image_url, int(payload.featured), int(payload.active), int(payload.out_of_stock), now, now),
+            (slug, payload.title.strip(), "", payload.description.strip(), payload.price, payload.category, payload.stock, image_url, int(payload.featured), int(payload.active), int(payload.out_of_stock), now, now),
         )
         product_id = cursor.lastrowid
         set_product_images(conn, product_id, [image_url])
@@ -946,10 +934,10 @@ def update_product(product_id: int, payload: ProductPayload, admin=Depends(requi
         next_image_url = storage_image_url(payload.image_url)
         conn.execute(
             """
-            UPDATE products SET title=?,summary=?,description=?,price=?,category=?,stock=?,image_url=?,featured=?,active=?,out_of_stock=?,updated_at=?
+            UPDATE products SET title=?,summary='',description=?,price=?,category=?,stock=?,image_url=?,featured=?,active=?,out_of_stock=?,updated_at=?
             WHERE id=?
             """,
-            (payload.title.strip(), payload.summary.strip(), payload.description.strip(), payload.price, payload.category, payload.stock, next_image_url, int(payload.featured), int(payload.active), int(payload.out_of_stock), now, product_id),
+            (payload.title.strip(), payload.description.strip(), payload.price, payload.category, payload.stock, next_image_url, int(payload.featured), int(payload.active), int(payload.out_of_stock), now, product_id),
         )
         if public_asset_url(existing["image_url"]) != public_asset_url(next_image_url):
             set_product_images(conn, product_id, [next_image_url])

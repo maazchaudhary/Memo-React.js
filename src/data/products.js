@@ -2,7 +2,6 @@ export const seedProducts = [
   {
     id: 1,
     title: "Dusk",
-    summary: "Silk shirt with embroidered details",
     description: "This tea pink kaftan-style shirt features elegant embroidery that adds a graceful touch to it's timeless silhouette. Designed for effortless style.",
     price: 16000,
     stock: 14,
@@ -17,7 +16,6 @@ export const seedProducts = [
   {
     id: 2,
     title: "Bloom",
-    summary: "Pastel embroidered long shirt",
     description: "A beautiful statement neckline. Soft ivory and blue embroidery with delicate cutwork adds elegance to the design, while subtle appliqués and a lace border create a graceful finish. A timeless outfit, perfect for any occasion.",
     price: 16000,
     stock: 19,
@@ -32,7 +30,6 @@ export const seedProducts = [
   {
     id: 3,
     title: "Amaya",
-    summary: "Embroidered occasion ensemble",
     description: "Kaftan-style shirt made on pure silk adorned with elegant thread embroidery. Its effortless silhouette and timeless detailing make it a versatile addition to any wardrobe.",
     price: 16000,
     category: "occasion-wear",
@@ -48,7 +45,6 @@ export const seedProducts = [
   {
     id: 4,
     title: "Kaira",
-    summary: "Botanical sage silk dress",
     description: "Kaira featuring intricate Ari embroidery on the front and back. Pearl work on the sleeves, lace on daman & side slits and pearl tassels on the neckline. Perfect for festive occasions and celebrations.              Note: Sleeves lining can be added upon request.",
     price: 16000,
     stock: 11,
@@ -64,7 +60,6 @@ export const seedProducts = [
   {
     id: 5,
     title: "Celine",
-    summary: "Easy elegance silk dress",
     description: "Mint green kaftan-style shirt featuring intricate appliqué work with vibrant embroidery. Finished with floral tassels on the neckline, adding a graceful and elegant touch to the design.",
     price: 16000,
     stock: 7,
@@ -80,7 +75,6 @@ export const seedProducts = [
   {
     id: 6,
     title: "Sapphire",
-    summary: "Embroidered silk kaftan",
     description: "Butter yellow kaftan-style shirt featuring intricate appliqué work with vibrant embroidery. Finished with floral tassels on the neckline, adding a graceful and elegant touch to the design.",
     price: 23000,
     stock: 5,
@@ -95,7 +89,6 @@ export const seedProducts = [
   {
     id: 7,
     title: "Lira Green",
-    summary: "Quiet colour embroidered set",
     description: "Adorned with 3d embroidery, handwork, and pearl accents on butter silk fabric.",
     price: 16000,
     stock: 16,
@@ -110,7 +103,6 @@ export const seedProducts = [
   {
     id: 8,
     title: "Lira Pink",
-    summary: "Fresh embroidered dress",
     description: "Adorned with 3d embroidery, handwork, and pearl accents on butter silk fabric.",
     price: 16000,
     stock: 9,
@@ -125,7 +117,6 @@ export const seedProducts = [
   {
     id: 9,
     title: "Raya",
-    summary: "Soft festive dress",
     description: "Kaftan style shirt featuring intricate multicolor thread embroidery across the shirt and sleeves. Designed for effortless styling, it’s a versatile piece that’s perfect for casual outings and semiformal occasions.",
     price: 16000,
     stock: 4,
@@ -142,7 +133,6 @@ export const seedProducts = [
   {
     id: 10,
     title: "Dove Blue",
-    summary: "Embroidered evening notes",
     description: "Three-piece ensemble featuring an embroidered shirt paired with flared pants. The pants can be customized to culottes or balloon pants and the look is completed with a three-yard medium silk dupatta adorned with appliqué embroidery on all four corners.",
     price: 25000,
     stock: 6,
@@ -157,7 +147,6 @@ export const seedProducts = [
   {
     id: 11,
     title: "Dove Lilac",
-    summary: "Occasion embroidered dress",
     description: "Three-piece ensemble featuring an embroidered shirt paired with flared pants. The pants can be customized to culottes or balloon pants and the look is completed with a three-yard medium silk dupatta adorned with appliqué embroidery on all four corners.",
     price: 25000,
     stock: 3,

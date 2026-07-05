@@ -22,9 +22,9 @@ export function addOnsLabel(addOns = []) {
   return labels.length ? labels.join(", ") : "None";
 }
 
-export function cartItemKey(id, size = "Medium", addOns = []) {
+export function cartItemKey(id, size = "M", addOns = []) {
   const addOnKey = normalizeAddOns(addOns).join("+") || "none";
-  return `${id}:${size || "Medium"}:${addOnKey}`;
+  return `${id}:${size || "M"}:${addOnKey}`;
 }
 
 export function readCart() {

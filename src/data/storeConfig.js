@@ -12,7 +12,7 @@ export const currencies = {
 };
 
 export const paymentOptions = ["Cash on Delivery", "Bank Transfer", "EasyPaisa / JazzCash"];
-export const sizeOptions = ["Extra Small", "Small", "Medium", "Large", "Custom"];
+export const sizeOptions = ["XS", "S", "M", "L", "XL", "Custom"];
 
 export const manualPaymentInstructions = {
   "Bank Transfer": "Transfer the final total to Memo by Miraal bank account and share your reference number. Account details: Memo by Miraal, IBAN PK00 MEMO 0000 0000 0000.",

@@ -44,7 +44,6 @@ export default function ProductCard({ product, currency, navigate, showHeart = f
         )}
       </div>
       <h2>{product.title}</h2>
-      <p>{product.summary}</p>
     </article>
   );
 }

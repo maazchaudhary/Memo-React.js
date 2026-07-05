@@ -11,7 +11,7 @@ import { addOnOptions, addOnsTotal, normalizeAddOns } from "../utils/cart";
 export default function ProductDetailPage({ product, products, currency, navigate, onAdd, message, stockRequestOpen, setStockRequestOpen }) {
   const [requestMessage, setRequestMessage] = useState("");
   const [imageIndex, setImageIndex] = useState(0);
-  const [selectedSize, setSelectedSize] = useState("Medium");
+  const [selectedSize, setSelectedSize] = useState("M");
   const [quantity, setQuantity] = useState(1);
   const [selectedAddOns, setSelectedAddOns] = useState([]);
   const [zoomed, setZoomed] = useState(false);
@@ -31,7 +31,7 @@ export default function ProductDetailPage({ product, products, currency, navigat
 
   useEffect(() => {
     setImageIndex(0);
-    setSelectedSize("Medium");
+    setSelectedSize("M");
     setQuantity(1);
     setSelectedAddOns([]);
     setZoomed(false);
@@ -137,7 +137,6 @@ export default function ProductDetailPage({ product, products, currency, navigat
           <p className="eyebrow">Memo collection</p>
           <h1>{product.title}</h1>
           <p className="product-detail-price">{money(displayPrice, currency)}</p>
-          <p className="product-detail-summary">{product.summary}</p>
 
           <div className="size-selector" aria-label="Select size">
             <span>Size</span>
@@ -149,21 +148,6 @@ export default function ProductDetailPage({ product, products, currency, navigat
               ))}
             </div>
           </div>
-
-          {!isManuallyOutOfStock && (
-            <div className="product-quantity" aria-label="Select quantity">
-              <span>Quantity</span>
-              <div className="quantity-stepper">
-                <button type="button" aria-label="Decrease quantity" disabled={quantity <= 1} onClick={() => updateQuantity(quantity - 1)}>
-                  -
-                </button>
-                <strong aria-live="polite">{quantity}</strong>
-                <button type="button" aria-label="Increase quantity" disabled={quantity >= maxQuantity} onClick={() => updateQuantity(quantity + 1)}>
-                  +
-                </button>
-              </div>
-            </div>
-          )}
 
           <div className="product-add-ons">
             <span>You May Also Add</span>
@@ -183,9 +167,26 @@ export default function ProductDetailPage({ product, products, currency, navigat
 
           {isManuallyOutOfStock && <small className="stock-note disabled">Out of Stock</small>}
 
-          <button className="add-to-cart" type="button" onClick={() => onAdd(product, selectedSize, quantity, selectedAddOns)}>
-            {isManuallyOutOfStock ? "Request Product" : "Add to cart"}
-          </button>
+          <div className="product-purchase-row">
+            {!isManuallyOutOfStock && (
+              <div className="product-quantity" aria-label="Select quantity">
+                <span>Quantity</span>
+                <div className="quantity-stepper">
+                  <button type="button" aria-label="Decrease quantity" disabled={quantity <= 1} onClick={() => updateQuantity(quantity - 1)}>
+                    -
+                  </button>
+                  <strong aria-live="polite">{quantity}</strong>
+                  <button type="button" aria-label="Increase quantity" disabled={quantity >= maxQuantity} onClick={() => updateQuantity(quantity + 1)}>
+                    +
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <button className="add-to-cart" type="button" onClick={() => onAdd(product, selectedSize, quantity, selectedAddOns)}>
+              {isManuallyOutOfStock ? "Request Product" : "Add to cart"}
+            </button>
+          </div>
 
           <p className="cart-message" aria-live="polite">{requestMessage || message}</p>
 

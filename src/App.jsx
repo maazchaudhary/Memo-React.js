@@ -130,7 +130,7 @@ export default function App() {
     }, 0);
   }
 
-  function addToCart(product, size = "Medium", quantity = 1, addOns = []) {
+  function addToCart(product, size = "M", quantity = 1, addOns = []) {
     if (!product) return;
 
     if (product.out_of_stock) {
@@ -139,7 +139,7 @@ export default function App() {
       return;
     }
 
-    const selectedSize = sizeOptions.includes(size) ? size : "Medium";
+    const selectedSize = sizeOptions.includes(size) ? size : "M";
     const selectedQuantity = Math.max(1, Math.floor(Number(quantity || 1)));
     const selectedAddOns = normalizeAddOns(addOns);
     const selectedAddOnsTotal = addOnsTotal(selectedAddOns);
