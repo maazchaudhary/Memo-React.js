@@ -202,6 +202,14 @@ body.nav-scrolled .header { background: rgba(255,255,255,.92); border-bottom-col
 .product-zoom-button { position: absolute; right: 18px; bottom: 18px; display: grid; width: 42px; height: 42px; padding: 0; place-items: center; border: 1px solid rgba(17,17,17,.18); border-radius: 50%; background: rgba(255,255,255,.92); color: var(--ink); box-shadow: 0 4px 16px rgba(31,29,25,.12); transition: background .2s ease, transform .2s ease; }
 .product-zoom-button:hover, .product-zoom-button:focus-visible, .product-zoom-button[aria-pressed="true"] { background: #111; color: #fff; transform: translateY(-1px); }
 .product-zoom-button svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.product-image-preview { position: fixed; z-index: 90; inset: 0; display: grid; place-items: center; padding: 0; background: #fff; }
+.product-image-preview img { width: 100vw; height: 100vh; height: 100svh; object-fit: contain; object-position: center; }
+.product-preview-close, .product-preview-nav { position: absolute; z-index: 2; display: grid; padding: 0; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--ink); box-shadow: none; }
+.product-preview-close { top: 12px; right: 12px; width: 30px; height: 30px; }
+.product-preview-nav { top: 50%; width: 32px; height: 32px; transform: translateY(-50%); }
+.product-preview-nav.previous { left: 10px; }
+.product-preview-nav.next { right: 10px; }
+.product-preview-close svg, .product-preview-nav svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .product-thumbnails { display: grid; gap: 12px; order: -1; }
 .product-thumbnails button { padding: 0; overflow: hidden; border: 1px solid transparent; background: var(--cream); opacity: .58; transition: border-color .2s ease, opacity .2s ease; }
 .product-thumbnails button.active, .product-thumbnails button:hover, .product-thumbnails button:focus-visible { border-color: var(--ink); opacity: 1; }

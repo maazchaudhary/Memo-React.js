@@ -16,6 +16,7 @@ export default function ProductDetailPage({ product, products, currency, navigat
   const [selectedAddOns, setSelectedAddOns] = useState([]);
   const [zoomed, setZoomed] = useState(false);
   const [zoomOrigin, setZoomOrigin] = useState("50% 50%");
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const gallery = productGallery(product);
   const activeImageIndex = gallery[imageIndex] ? imageIndex : 0;
@@ -35,11 +36,30 @@ export default function ProductDetailPage({ product, products, currency, navigat
     setQuantity(1);
     setSelectedAddOns([]);
     setZoomed(false);
+    setPreviewOpen(false);
   }, [product?.id]);
 
   useEffect(() => {
     setQuantity((current) => Math.min(Math.max(1, current), maxQuantity));
   }, [maxQuantity]);
+
+  useEffect(() => {
+    document.body.classList.toggle("modal-open", previewOpen);
+    return () => document.body.classList.remove("modal-open");
+  }, [previewOpen]);
+
+  useEffect(() => {
+    if (!previewOpen) return undefined;
+
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") setPreviewOpen(false);
+      if (event.key === "ArrowLeft") showPreviousImage();
+      if (event.key === "ArrowRight") showNextImage();
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [previewOpen, gallery.length]);
 
   function updateQuantity(nextQuantity) {
     setQuantity(Math.min(maxQuantity, Math.max(1, nextQuantity)));
@@ -51,6 +71,24 @@ export default function ProductDetailPage({ product, products, currency, navigat
     const x = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100));
     const y = Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100));
     setZoomOrigin(`${x}% ${y}%`);
+  }
+
+  function toggleImagePreview() {
+    if (window.matchMedia("(max-width: 600px)").matches) {
+      setZoomed(false);
+      setPreviewOpen(true);
+      return;
+    }
+
+    setZoomed((current) => !current);
+  }
+
+  function showPreviousImage() {
+    setImageIndex((current) => (current - 1 + gallery.length) % gallery.length);
+  }
+
+  function showNextImage() {
+    setImageIndex((current) => (current + 1) % gallery.length);
   }
 
   function toggleAddOn(addOnId) {
@@ -117,7 +155,7 @@ export default function ProductDetailPage({ product, products, currency, navigat
         <div className={`product-gallery${gallery.length > 1 ? "" : " single-image"}`} aria-label={`${product.title} images`}>
           <div className={`product-gallery-main${zoomed ? " zoomed" : ""}`} onMouseMove={moveZoom}>
             <img src={gallery[activeImageIndex]} alt={`${product.title} ${activeImageIndex + 1}`} style={{ transformOrigin: zoomOrigin }} />
-            <button className="product-zoom-button" type="button" aria-label={zoomed ? `Zoom out ${product.title} image` : `Zoom in ${product.title} image`} aria-pressed={zoomed} onClick={() => setZoomed((current) => !current)}>
+            <button className="product-zoom-button" type="button" aria-label={zoomed ? `Zoom out ${product.title} image` : `Zoom in ${product.title} image`} aria-pressed={zoomed} onClick={toggleImagePreview}>
               <Icon type="zoom" />
             </button>
           </div>
@@ -132,6 +170,28 @@ export default function ProductDetailPage({ product, products, currency, navigat
             </div>
           )}
         </div>
+
+        {previewOpen && (
+          <div className="product-image-preview" role="dialog" aria-modal="true" aria-label={`${product.title} image preview`}>
+            <button className="product-preview-close" type="button" aria-label="Close image preview" onClick={() => setPreviewOpen(false)}>
+              <Icon type="close" />
+            </button>
+
+            {gallery.length > 1 && (
+              <button className="product-preview-nav previous" type="button" aria-label="Previous image" onClick={showPreviousImage}>
+                <Icon type="chevron-left" />
+              </button>
+            )}
+
+            <img src={gallery[activeImageIndex]} alt={`${product.title} ${activeImageIndex + 1}`} />
+
+            {gallery.length > 1 && (
+              <button className="product-preview-nav next" type="button" aria-label="Next image" onClick={showNextImage}>
+                <Icon type="chevron-right" />
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="product-detail-copy">
           <p className="eyebrow">Memo collection</p>
