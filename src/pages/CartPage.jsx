@@ -2,7 +2,7 @@ import Link from "../components/Link";
 import CartItems from "../components/CartItems";
 import OrderSummary from "../components/OrderSummary";
 
-export default function CartPage({ cart, totals, currency, navigate, updateSize, removeItem, openCart }) {
+export default function CartPage({ cart, totals, currency, navigate, updateSize, updateQuantity, removeItem, openCart }) {
   return (
     <main className="checkout-page cart-page">
       <nav className="breadcrumbs" aria-label="Breadcrumb">
@@ -15,7 +15,7 @@ export default function CartPage({ cart, totals, currency, navigate, updateSize,
         <div className="checkout-card">
           <p className="eyebrow">Shopping bag</p>
           <h1>Your Cart</h1>
-          <CartItems cart={cart} currency={currency} updateSize={updateSize} removeItem={removeItem} />
+          <CartItems cart={cart} currency={currency} updateSize={updateSize} updateQuantity={updateQuantity} removeItem={removeItem} />
           {!cart.length && (
             <button className="checkout-button secondary" type="button" onClick={() => navigate("/new-arrivals")}>
               Continue shopping

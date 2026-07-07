@@ -1,7 +1,9 @@
 import { money } from "../utils/money";
 import { addOnsLabel, cartItemKey } from "../utils/cart";
 
-export default function OrderSummary({ cart, totals, currency, compact = false }) {
+export default function OrderSummary({ cart, totals, currency, compact = false, coupon = null }) {
+  const totalDiscount = Number(totals.couponDiscount || 0) + Number(totals.shippingDiscount || 0);
+
   return (
     <section className={`order-summary${compact ? " compact" : ""}`} aria-label="Order summary">
       <h2>Order summary</h2>
@@ -15,6 +17,7 @@ export default function OrderSummary({ cart, totals, currency, compact = false }
       </div>
       <div className="summary-totals">
         <p><span>Subtotal</span><strong>{money(totals.subtotal, currency)}</strong></p>
+        {coupon && totalDiscount > 0 && <p className="summary-discount"><span>Coupon ({coupon.code})</span><strong>-{money(totalDiscount, currency)}</strong></p>}
         <p><span>Delivery fee</span><strong>{money(totals.deliveryFee, currency)}</strong></p>
         <p className="summary-final"><span>Total</span><strong>{money(totals.finalTotal, currency)}</strong></p>
       </div>

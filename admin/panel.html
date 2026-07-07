@@ -8,10 +8,35 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="admin.css?v=4">
+  <link rel="stylesheet" href="admin.css?v=5">
 </head>
 <body>
   <main class="admin-app" id="adminApp">
+    <header class="mobile-adminbar">
+      <a class="mobile-brand" href="/index.html"><img src="../assets/memo-logo.png" alt="Memo"></a>
+      <label class="mobile-section-picker" aria-label="Admin section">
+        <select id="mobileSectionSelect">
+          <option value="dashboard" data-section-option="dashboard">Dashboard</option>
+          <option value="products" data-section-option="products">Products</option>
+          <option value="inventory" data-section-option="inventory">Inventory</option>
+          <option value="orders" data-section-option="orders">Orders</option>
+          <option value="coupons" data-section-option="coupons">Coupons</option>
+          <option value="requests" data-section-option="requests">Requests</option>
+          <option value="sales" data-section-option="sales">Sales</option>
+          <option value="users" data-section-option="users">Admin Users</option>
+        </select>
+      </label>
+      <details class="profile-menu" id="profileMenu">
+        <summary aria-label="Profile">
+          <span id="mobileProfileInitial">A</span>
+        </summary>
+        <div class="profile-panel">
+          <strong id="mobileProfileName">Admin</strong>
+          <button type="button" data-logout>Logout</button>
+        </div>
+      </details>
+    </header>
+
     <aside class="sidebar">
       <a class="brand" href="/index.html"><img src="../assets/memo-logo.png" alt="Memo"></a>
       <nav>
@@ -19,11 +44,12 @@
         <button data-section="products">Products</button>
         <button data-section="inventory">Inventory</button>
         <button data-section="orders">Orders</button>
+        <button data-section="coupons">Coupons</button>
         <button data-section="requests">Requests</button>
         <button data-section="sales">Sales</button>
         <button data-section="users">Admin Users</button>
       </nav>
-      <button class="logout" id="logoutButton">Logout</button>
+      <button class="logout" type="button" data-logout>Logout</button>
     </aside>
 
     <section class="workspace">
@@ -111,7 +137,33 @@
       <section class="section" id="ordersSection">
         <div class="panel">
           <h2>Customer Orders</h2>
-          <div class="table-wrap"><table><thead><tr><th>Order ID</th><th>Customer Details</th><th>Items</th><th>Add-ons</th><th>Total</th><th>Payment Method</th><th>Payment Status</th><th>Reference</th><th>Order Status</th><th>Date</th></tr></thead><tbody id="ordersTable"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>Order ID</th><th>Customer Details</th><th>Items</th><th>Add-ons</th><th>Total</th><th>Coupon</th><th>Payment Method</th><th>Payment Status</th><th>Reference</th><th>Order Status</th><th>Date</th></tr></thead><tbody id="ordersTable"></tbody></table></div>
+        </div>
+      </section>
+
+      <section class="section" id="couponsSection">
+        <div class="split">
+          <form class="panel form-grid" id="couponForm">
+            <h2 id="couponFormTitle">Create Coupon</h2>
+            <input type="hidden" name="id">
+            <label>Coupon code<input name="code" required minlength="2" maxlength="40" placeholder="EID25"></label>
+            <label>Coupon type<select name="coupon_type">
+              <option value="percentage">Percentage discount</option>
+              <option value="fixed">Fixed amount discount</option>
+              <option value="free_shipping">Free shipping</option>
+            </select></label>
+            <label>Discount value<input name="discount_value" type="number" min="0" placeholder="25 or 1000"></label>
+            <label>Number of coupons<input name="quantity" type="number" min="1" required value="10"></label>
+            <label class="check wide"><input name="active" type="checkbox" checked> Active</label>
+            <div class="form-actions">
+              <button type="submit">Save coupon</button>
+              <button type="button" id="resetCouponForm">Clear</button>
+            </div>
+          </form>
+          <div class="panel">
+            <h2>Coupons</h2>
+            <div class="table-wrap"><table><thead><tr><th>Code</th><th>Type</th><th>Discount</th><th>Usage</th><th>Status</th><th>Actions</th></tr></thead><tbody id="couponsTable"></tbody></table></div>
+          </div>
         </div>
       </section>
 
@@ -149,6 +201,6 @@
     </section>
   </main>
 
-  <script src="admin.js?v=6"></script>
+  <script src="admin.js?v=8"></script>
 </body>
 </html>

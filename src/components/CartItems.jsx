@@ -3,7 +3,7 @@ import { addOnsLabel, cartItemKey } from "../utils/cart";
 import { assetUrl } from "../utils/product";
 import { money } from "../utils/money";
 
-export default function CartItems({ cart, currency, updateSize, removeItem }) {
+export default function CartItems({ cart, currency, updateSize, updateQuantity, removeItem }) {
   return (
     <div className="cart-items">
       {cart.length ? cart.map((item) => {
@@ -32,7 +32,25 @@ export default function CartItems({ cart, currency, updateSize, removeItem }) {
                   </button>
                 ))}
               </div>
-              <span className="cart-quantity">Qty {item.quantity}</span>
+              <div className="cart-quantity-stepper" aria-label={`Adjust quantity for ${item.title}`}>
+                <button
+                  type="button"
+                  aria-label={`Decrease ${item.title} quantity`}
+                  disabled={Number(item.quantity || 1) <= 1}
+                  onClick={() => updateQuantity(itemKey, Number(item.quantity || 1) - 1)}
+                >
+                  -
+                </button>
+                <strong aria-live="polite">Qty {item.quantity}</strong>
+                <button
+                  type="button"
+                  aria-label={`Increase ${item.title} quantity`}
+                  disabled={Number(item.quantity || 1) >= 99}
+                  onClick={() => updateQuantity(itemKey, Number(item.quantity || 1) + 1)}
+                >
+                  +
+                </button>
+              </div>
             </div>
             <button type="button" aria-label={`Remove ${item.title}`} onClick={() => removeItem(itemKey)}>Remove</button>
           </div>

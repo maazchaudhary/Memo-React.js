@@ -211,6 +211,18 @@ export default function App() {
     });
   }
 
+  function updateQuantity(itemKey, nextQuantity) {
+    const quantity = Math.max(1, Math.min(99, Math.floor(Number(nextQuantity || 1))));
+
+    setCart((items) =>
+      items.map((item) =>
+        (item.key || cartItemKey(item.product_id, item.size, item.add_ons)) === itemKey
+          ? { ...item, quantity }
+          : item
+      )
+    );
+  }
+
   function removeItem(itemKey) {
     setCart((items) => items.filter((item) => (item.key || cartItemKey(item.product_id, item.size, item.add_ons)) !== itemKey));
   }
@@ -230,6 +242,7 @@ export default function App() {
         currency={currency}
         navigate={navigate}
         updateSize={updateSize}
+        updateQuantity={updateQuantity}
         removeItem={removeItem}
         openCart={() => setCartOpen(true)}
       />
@@ -298,6 +311,7 @@ export default function App() {
         currency={currency}
         navigate={navigate}
         updateSize={updateSize}
+        updateQuantity={updateQuantity}
         removeItem={removeItem}
       />
     </>

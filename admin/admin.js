@@ -5,6 +5,7 @@ let currentAdmin = null;
 let products = [];
 let orders = [];
 let stockRequests = [];
+let coupons = [];
 let dashboardSalesPeriod = "weekly";
 const isAuthPage = Boolean(document.querySelector("#authView"));
 const isPanelPage = Boolean(document.querySelector("#adminApp"));
@@ -13,7 +14,7 @@ const panelPage = location.protocol === "file:" ? "panel.html" : "/admin/panel";
 const resetToken = new URLSearchParams(window.location.search).get("reset_token");
 
 const permissions = {
-  super_admin: ["dashboard:view", "products:view", "products:create", "products:update", "products:delete", "inventory:update", "orders:view", "orders:update", "sales:view", "admins:manage"],
+  super_admin: ["dashboard:view", "products:view", "products:create", "products:update", "products:delete", "inventory:update", "orders:view", "orders:update", "sales:view", "admins:manage", "coupons:manage"],
   editor: ["dashboard:view", "products:view", "products:create", "products:update", "inventory:update", "orders:view", "orders:update"],
   viewer: ["dashboard:view", "products:view", "orders:view", "sales:view"]
 };
@@ -50,6 +51,20 @@ function productDiscountText(product) {
   return percent ? `${percent}% off` : "None";
 }
 
+function couponTypeText(type) {
+  return {
+    percentage: "Percentage discount",
+    fixed: "Fixed amount discount",
+    free_shipping: "Free shipping"
+  }[type] || "Coupon";
+}
+
+function couponDiscountText(coupon) {
+  if (coupon.coupon_type === "percentage") return `${Number(coupon.discount_value || 0)}% off`;
+  if (coupon.coupon_type === "fixed") return `${money(coupon.discount_value)} off`;
+  return "Free shipping";
+}
+
 function dateText(timestamp) {
   return new Date(Number(timestamp) * 1000).toLocaleString();
 }
@@ -79,6 +94,31 @@ function showNotice(message, ok = false) {
   if (!notice) return;
   notice.textContent = message || "";
   notice.style.color = ok ? "#4f6b52" : "#8b4148";
+}
+
+function adminRoleText() {
+  return currentAdmin?.role ? currentAdmin.role.replace("_", " ") : "";
+}
+
+function setSectionVisible(section, visible) {
+  document.querySelectorAll(`[data-section="${section}"]`).forEach((item) => {
+    item.hidden = !visible;
+    if ("disabled" in item) item.disabled = !visible;
+  });
+  document.querySelectorAll(`[data-section-option="${section}"]`).forEach((item) => {
+    item.hidden = !visible;
+    item.disabled = !visible;
+  });
+}
+
+function showSection(section, labelText = "") {
+  document.querySelectorAll(".sidebar [data-section]").forEach((item) => item.classList.toggle("active", item.dataset.section === section));
+  document.querySelectorAll(".section").forEach((item) => item.classList.toggle("active", item.id === `${section}Section`));
+  const title = labelText || document.querySelector(`.sidebar [data-section="${section}"]`)?.textContent || label(section);
+  document.querySelector("#sectionTitle").textContent = title;
+  const mobileSelect = document.querySelector("#mobileSectionSelect");
+  if (mobileSelect && mobileSelect.value !== section) mobileSelect.value = section;
+  showNotice("");
 }
 
 function setProductSaveState(form, isSaving) {
@@ -147,7 +187,9 @@ async function bootstrap() {
   try {
     currentAdmin = await request("/api/admin/me");
     if (isAuthPage && !resetToken) return goToPanel();
-    document.querySelector("#adminBadge").textContent = `${currentAdmin.name} · ${currentAdmin.role.replace("_", " ")}`;
+    document.querySelector("#adminBadge").textContent = `${currentAdmin.name} · ${adminRoleText()}`;
+    document.querySelector("#mobileProfileName").textContent = currentAdmin.name;
+    document.querySelector("#mobileProfileInitial").textContent = (currentAdmin.name || "A").trim().charAt(0).toUpperCase();
     applyRoleUI();
     await refreshAll();
   } catch (error) {
@@ -159,11 +201,16 @@ async function bootstrap() {
 }
 
 function applyRoleUI() {
-  document.querySelector('[data-section="users"]').hidden = !can("admins:manage");
-  document.querySelector('[data-section="sales"]').hidden = !can("sales:view");
-  document.querySelector('[data-section="requests"]').hidden = !can("orders:view");
+  setSectionVisible("users", can("admins:manage"));
+  setSectionVisible("sales", can("sales:view"));
+  setSectionVisible("requests", can("orders:view"));
+  setSectionVisible("coupons", can("coupons:manage"));
   document.querySelector("#productForm").classList.toggle("hidden", !can("products:create") && !can("products:update"));
   document.querySelector("#userForm").classList.toggle("hidden", !can("admins:manage"));
+  document.querySelector("#couponForm").classList.toggle("hidden", !can("coupons:manage"));
+  const activeSection = document.querySelector(".section.active")?.id?.replace("Section", "");
+  const activeButton = activeSection ? document.querySelector(`.sidebar [data-section="${activeSection}"]`) : null;
+  if (activeButton?.hidden) showSection("dashboard", "Dashboard");
 }
 
 async function refreshAll() {
@@ -173,6 +220,7 @@ async function refreshAll() {
   if (can("orders:view")) tasks.push(loadStockRequests());
   if (can("sales:view")) tasks.push(loadSales());
   if (can("admins:manage")) tasks.push(loadUsers());
+  if (can("coupons:manage")) tasks.push(loadCoupons());
   await Promise.all(tasks);
   renderDashboard();
 }
@@ -363,6 +411,102 @@ async function updateStock(id) {
   showNotice("Stock updated.", true);
 }
 
+async function loadCoupons() {
+  coupons = await request("/api/admin/coupons");
+  renderCoupons();
+}
+
+function renderCoupons() {
+  const tbody = document.querySelector("#couponsTable");
+  if (!tbody) return;
+  tbody.innerHTML = coupons.length ? coupons.map((coupon) => {
+    const used = Number(coupon.used_count || 0);
+    const quantity = Number(coupon.quantity || 0);
+    const remaining = Math.max(0, quantity - used);
+    return `
+      <tr>
+        <td><strong>${escapeHtml(coupon.code)}</strong></td>
+        <td>${escapeHtml(couponTypeText(coupon.coupon_type))}</td>
+        <td>${escapeHtml(couponDiscountText(coupon))}</td>
+        <td>${used} / ${quantity}<small>${remaining} remaining</small></td>
+        <td class="${coupon.active && remaining > 0 ? "status-ok" : "status-out"}">${coupon.active && remaining > 0 ? "Active" : "Disabled"}</td>
+        <td><div class="actions">
+          <button data-edit-coupon="${Number(coupon.id)}">Edit</button>
+          <button data-toggle-coupon="${Number(coupon.id)}">${coupon.active ? "Disable" : "Activate"}</button>
+        </div></td>
+      </tr>
+    `;
+  }).join("") : `<tr><td colspan="6">No coupons yet.</td></tr>`;
+  tbody.querySelectorAll("[data-edit-coupon]").forEach((button) => button.addEventListener("click", () => editCoupon(Number(button.dataset.editCoupon))));
+  tbody.querySelectorAll("[data-toggle-coupon]").forEach((button) => button.addEventListener("click", () => toggleCoupon(Number(button.dataset.toggleCoupon))));
+}
+
+function setCouponDiscountEnabled(form) {
+  if (!form?.elements.coupon_type || !form?.elements.discount_value) return;
+  const isFreeShipping = form.elements.coupon_type.value === "free_shipping";
+  form.elements.discount_value.disabled = isFreeShipping;
+  form.elements.discount_value.required = !isFreeShipping;
+  if (isFreeShipping) form.elements.discount_value.value = 0;
+}
+
+function editCoupon(id) {
+  const coupon = coupons.find((item) => item.id === id);
+  const form = document.querySelector("#couponForm");
+  form.elements.id.value = coupon.id;
+  form.elements.code.value = coupon.code;
+  form.elements.coupon_type.value = coupon.coupon_type;
+  form.elements.discount_value.value = coupon.discount_value || 0;
+  form.elements.quantity.value = coupon.quantity;
+  form.elements.active.checked = Boolean(coupon.active);
+  setCouponDiscountEnabled(form);
+  document.querySelector("#couponFormTitle").textContent = "Edit Coupon";
+}
+
+async function saveCoupon(event) {
+  event.preventDefault();
+  if (!can("coupons:manage")) return;
+  const form = event.currentTarget;
+  const fields = form.elements;
+  const payload = {
+    code: fields.code.value.trim().toUpperCase(),
+    coupon_type: fields.coupon_type.value,
+    discount_value: fields.coupon_type.value === "free_shipping" ? 0 : Number(fields.discount_value.value),
+    quantity: Number(fields.quantity.value),
+    active: fields.active.checked
+  };
+  const id = fields.id.value;
+  try {
+    await request(id ? `/api/admin/coupons/${id}` : "/api/admin/coupons", { method: id ? "PUT" : "POST", body: JSON.stringify(payload) });
+    resetCouponForm();
+    await loadCoupons();
+    showNotice("Coupon saved.", true);
+  } catch (error) {
+    showNotice(error.message || "Coupon could not be saved.");
+  }
+}
+
+function resetCouponForm() {
+  const form = document.querySelector("#couponForm");
+  form.reset();
+  form.elements.id.value = "";
+  form.elements.quantity.value = 10;
+  form.elements.active.checked = true;
+  setCouponDiscountEnabled(form);
+  document.querySelector("#couponFormTitle").textContent = "Create Coupon";
+}
+
+async function toggleCoupon(id) {
+  const coupon = coupons.find((item) => item.id === id);
+  if (!coupon) return;
+  try {
+    await request(`/api/admin/coupons/${id}/active`, { method: "PATCH", body: JSON.stringify({ active: !coupon.active }) });
+    await loadCoupons();
+    showNotice(coupon.active ? "Coupon disabled." : "Coupon activated.", true);
+  } catch (error) {
+    showNotice(error.message || "Coupon status could not be updated.");
+  }
+}
+
 async function loadOrders() {
   orders = await request("/api/admin/orders");
   renderOrders();
@@ -402,7 +546,8 @@ function renderOrders() {
       <td><strong>${escapeHtml(order.customer_name)}</strong><small>${escapeHtml(order.phone)}<br>${escapeHtml(order.email)}<br>${escapeHtml(order.address)}, ${escapeHtml(order.city)}${order.notes ? `<br>Notes: ${escapeHtml(order.notes)}` : ""}</small></td>
       <td>${order.items.map((item) => `${escapeHtml(item.title)}<small>Size: ${escapeHtml(item.size || "M")} · Qty: ${Number(item.quantity || 0)}</small>`).join("")}</td>
       <td>${orderAddOnsText(order)}</td>
-      <td>${money(order.total)}<small>Subtotal ${money(order.subtotal || order.total)}<br>Delivery ${money(order.delivery_fee || 0)}</small></td>
+      <td>${money(order.total)}<small>Subtotal ${money(order.subtotal || order.total)}<br>Delivery ${money(order.delivery_fee || 0)}${Number(order.coupon_discount || 0) || Number(order.shipping_discount || 0) ? `<br>Discount ${money(Number(order.coupon_discount || 0) + Number(order.shipping_discount || 0))}` : ""}</small></td>
+      <td>${order.coupon_code ? `<strong>${escapeHtml(order.coupon_code)}</strong><small>${money(Number(order.coupon_discount || 0) + Number(order.shipping_discount || 0))} off</small>` : "<small>None</small>"}</td>
       <td>${escapeHtml(order.payment_method)}</td>
       <td><select class="status-select" data-payment-status="${Number(order.id)}" ${can("orders:update") ? "" : "disabled"}>
         ${["Pending", "Awaiting Confirmation", "Paid", "Failed", "Refunded"].map((status) => `<option ${status === order.payment_status ? "selected" : ""}>${status}</option>`).join("")}
@@ -695,24 +840,30 @@ if (resetPasswordForm) {
   });
 }
 
-const logoutButton = document.querySelector("#logoutButton");
-if (logoutButton) {
-  logoutButton.addEventListener("click", async () => {
+document.querySelectorAll("[data-logout]").forEach((button) => {
+  button.addEventListener("click", async () => {
     await request("/api/admin/logout", { method: "POST" }).catch(() => {});
     localStorage.removeItem(tokenKey);
     token = null;
     currentAdmin = null;
     goToAuth();
   });
-}
+});
 
 document.querySelectorAll(".sidebar [data-section]").forEach((button) => {
   button.addEventListener("click", () => {
-    document.querySelectorAll(".sidebar [data-section]").forEach((item) => item.classList.toggle("active", item === button));
-    document.querySelectorAll(".section").forEach((section) => section.classList.toggle("active", section.id === `${button.dataset.section}Section`));
-    document.querySelector("#sectionTitle").textContent = button.textContent;
-    showNotice("");
+    showSection(button.dataset.section, button.textContent);
   });
+});
+
+document.querySelector("#mobileSectionSelect")?.addEventListener("change", (event) => {
+  const option = event.currentTarget.selectedOptions[0];
+  showSection(event.currentTarget.value, option?.textContent || "");
+});
+
+document.addEventListener("click", (event) => {
+  const profileMenu = document.querySelector("#profileMenu");
+  if (profileMenu && !profileMenu.contains(event.target)) profileMenu.open = false;
 });
 
 document.querySelectorAll("[data-sales-period]").forEach((button) => {
@@ -727,7 +878,11 @@ document.querySelector("#productForm")?.addEventListener("submit", saveProduct);
 document.querySelector("#resetProductForm")?.addEventListener("click", resetProductForm);
 document.querySelector('#productForm [name="discount_enabled"]')?.addEventListener("change", (event) => setDiscountFieldsEnabled(event.currentTarget.form, event.currentTarget.checked));
 document.querySelector("#userForm")?.addEventListener("submit", createUser);
+document.querySelector("#couponForm")?.addEventListener("submit", saveCoupon);
+document.querySelector("#resetCouponForm")?.addEventListener("click", resetCouponForm);
+document.querySelector('#couponForm [name="coupon_type"]')?.addEventListener("change", (event) => setCouponDiscountEnabled(event.currentTarget.form));
 
 setDiscountFieldsEnabled(document.querySelector("#productForm"), false);
+setCouponDiscountEnabled(document.querySelector("#couponForm"));
 bootstrap();
 window.MemoAdminReady = true;

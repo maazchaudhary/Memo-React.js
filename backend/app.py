@@ -82,7 +82,7 @@ app.add_middleware(
 )
 
 ROLE_PERMISSIONS = {
-    "super_admin": {"dashboard:view", "products:view", "products:create", "products:update", "products:delete", "inventory:update", "orders:view", "orders:update", "sales:view", "admins:manage"},
+    "super_admin": {"dashboard:view", "products:view", "products:create", "products:update", "products:delete", "inventory:update", "orders:view", "orders:update", "sales:view", "admins:manage", "coupons:manage"},
     "editor": {"dashboard:view", "products:view", "products:create", "products:update", "inventory:update", "orders:view", "orders:update"},
     "viewer": {"dashboard:view", "products:view", "orders:view", "sales:view"},
 }
@@ -293,6 +293,7 @@ class CheckoutPayload(BaseModel):
     notes: str | None = Field(default="", max_length=500)
     payment_method: str = Field(default="Cash on Delivery", max_length=80)
     transaction_reference: str | None = Field(default="", max_length=120)
+    coupon_code: str | None = Field(default="", max_length=40)
     items: list[OrderItemPayload] = Field(min_length=1)
 
 
@@ -318,6 +319,14 @@ class StockRequestStatusPayload(BaseModel):
 
 class RolePayload(BaseModel):
     role: Literal["super_admin", "editor", "viewer"]
+
+
+class CouponPayload(BaseModel):
+    code: str = Field(min_length=2, max_length=40)
+    coupon_type: Literal["percentage", "fixed", "free_shipping"]
+    discount_value: int = Field(default=0, ge=0)
+    quantity: int = Field(ge=1, le=100000)
+    active: bool = True
 
 
 def db() -> sqlite3.Connection:
@@ -398,6 +407,63 @@ def slugify(value: str) -> str:
 
 def order_number(order_id: int):
     return f"MEMO-{order_id:05d}"
+
+
+def normalize_coupon_code(value: str | None):
+    return "".join(str(value or "").strip().upper().split())
+
+
+def validate_coupon_payload(payload: CouponPayload):
+    code = normalize_coupon_code(payload.code)
+    if not code:
+        raise HTTPException(status_code=400, detail="Enter a coupon code.")
+    if payload.coupon_type == "percentage":
+        if payload.discount_value <= 0 or payload.discount_value >= 100:
+            raise HTTPException(status_code=400, detail="Percentage coupons must be between 1 and 99.")
+    elif payload.coupon_type == "fixed":
+        if payload.discount_value <= 0:
+            raise HTTPException(status_code=400, detail="Fixed amount coupons must be greater than zero.")
+    else:
+        if payload.discount_value != 0:
+            raise HTTPException(status_code=400, detail="Free shipping coupons do not need a discount amount.")
+    return code
+
+
+def serialize_coupon(row: sqlite3.Row | None):
+    coupon = row_dict(row)
+    if not coupon:
+        return None
+    coupon["active"] = bool(coupon["active"])
+    coupon["remaining"] = max(0, int(coupon["quantity"] or 0) - int(coupon["used_count"] or 0))
+    coupon["exhausted"] = coupon["remaining"] <= 0
+    return coupon
+
+
+def coupon_discount(coupon: sqlite3.Row, subtotal: int, delivery_fee: int):
+    coupon_type = coupon["coupon_type"]
+    discount_value = int(coupon["discount_value"] or 0)
+    if coupon_type == "percentage":
+        return min(subtotal, round(subtotal * discount_value / 100)), 0
+    if coupon_type == "fixed":
+        return min(subtotal, discount_value), 0
+    if coupon_type == "free_shipping":
+        return 0, delivery_fee
+    return 0, 0
+
+
+def active_coupon_row(conn: sqlite3.Connection, code: str | None):
+    clean_code = normalize_coupon_code(code)
+    if not clean_code:
+        return None
+    coupon = conn.execute("SELECT * FROM coupons WHERE code = ?", (clean_code,)).fetchone()
+    if not coupon:
+        raise HTTPException(status_code=400, detail="Coupon code is not valid.")
+    if not coupon["active"]:
+        raise HTTPException(status_code=400, detail="This coupon is disabled.")
+    if int(coupon["used_count"] or 0) >= int(coupon["quantity"] or 0):
+        conn.execute("UPDATE coupons SET active=0, updated_at=? WHERE id=?", (int(time.time()), coupon["id"]))
+        raise HTTPException(status_code=400, detail="This coupon has already been used.")
+    return coupon
 
 
 def normalize_add_ons(add_ons: list[str] | None):
@@ -643,6 +709,9 @@ def init_db():
               notes TEXT,
               subtotal INTEGER NOT NULL DEFAULT 0,
               delivery_fee INTEGER NOT NULL DEFAULT 0,
+              coupon_code TEXT,
+              coupon_discount INTEGER NOT NULL DEFAULT 0,
+              shipping_discount INTEGER NOT NULL DEFAULT 0,
               total INTEGER NOT NULL,
               payment_method TEXT NOT NULL,
               payment_status TEXT NOT NULL DEFAULT 'Pending',
@@ -663,6 +732,17 @@ def init_db():
               quantity INTEGER NOT NULL,
               line_total INTEGER NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS coupons (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              code TEXT NOT NULL UNIQUE COLLATE NOCASE,
+              coupon_type TEXT NOT NULL CHECK(coupon_type IN ('percentage','fixed','free_shipping')),
+              discount_value INTEGER NOT NULL DEFAULT 0 CHECK(discount_value >= 0),
+              quantity INTEGER NOT NULL CHECK(quantity >= 1),
+              used_count INTEGER NOT NULL DEFAULT 0 CHECK(used_count >= 0),
+              active INTEGER NOT NULL DEFAULT 1,
+              created_at INTEGER NOT NULL,
+              updated_at INTEGER NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS stock_requests (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               product_id INTEGER NOT NULL REFERENCES products(id),
@@ -682,6 +762,9 @@ def init_db():
         )
         ensure_column(conn, "orders", "subtotal", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(conn, "orders", "delivery_fee", "INTEGER NOT NULL DEFAULT 0")
+        ensure_column(conn, "orders", "coupon_code", "TEXT")
+        ensure_column(conn, "orders", "coupon_discount", "INTEGER NOT NULL DEFAULT 0")
+        ensure_column(conn, "orders", "shipping_discount", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(conn, "orders", "transaction_reference", "TEXT")
         ensure_column(conn, "order_items", "size", "TEXT NOT NULL DEFAULT 'M'")
         ensure_column(conn, "order_items", "add_ons", "TEXT NOT NULL DEFAULT 'None'")
@@ -792,13 +875,20 @@ def checkout(payload: CheckoutPayload):
             raise HTTPException(status_code=400, detail="Add at least one product to checkout.")
 
         payment_status = "Awaiting Confirmation" if payload.payment_method in MANUAL_PAYMENT_METHODS else "Pending"
-        total = subtotal + DELIVERY_FEE
+        coupon = active_coupon_row(conn, payload.coupon_code)
+        coupon_discount_amount = 0
+        shipping_discount_amount = 0
+        if coupon:
+            coupon_discount_amount, shipping_discount_amount = coupon_discount(coupon, subtotal, DELIVERY_FEE)
+        payable_delivery_fee = max(0, DELIVERY_FEE - shipping_discount_amount)
+        total = max(0, subtotal - coupon_discount_amount) + payable_delivery_fee
         transaction_reference = (payload.transaction_reference or "").strip()
+        coupon_code = coupon["code"] if coupon else None
 
         cursor = conn.execute(
             """
-            INSERT INTO orders (customer_name,phone,email,address,city,notes,subtotal,delivery_fee,total,payment_method,payment_status,transaction_reference,status,created_at,updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            INSERT INTO orders (customer_name,phone,email,address,city,notes,subtotal,delivery_fee,coupon_code,coupon_discount,shipping_discount,total,payment_method,payment_status,transaction_reference,status,created_at,updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 payload.customer_name.strip(),
@@ -808,7 +898,10 @@ def checkout(payload: CheckoutPayload):
                 payload.city.strip(),
                 (payload.notes or "").strip(),
                 subtotal,
-                DELIVERY_FEE,
+                payable_delivery_fee,
+                coupon_code,
+                coupon_discount_amount,
+                shipping_discount_amount,
                 total,
                 payload.payment_method,
                 payment_status,
@@ -819,6 +912,13 @@ def checkout(payload: CheckoutPayload):
             ),
         )
         order_id = cursor.lastrowid
+        if coupon:
+            next_used_count = int(coupon["used_count"] or 0) + 1
+            next_active = 0 if next_used_count >= int(coupon["quantity"] or 0) else int(coupon["active"])
+            conn.execute(
+                "UPDATE coupons SET used_count=?, active=?, updated_at=? WHERE id=?",
+                (next_used_count, next_active, now, coupon["id"]),
+            )
         for product, quantity, size, item_price, item_add_ons, item_add_ons_total, line_total in order_items:
             conn.execute(
                 "INSERT INTO order_items (order_id,product_id,title,size,price,add_ons,add_ons_total,quantity,line_total) VALUES (?,?,?,?,?,?,?,?,?)",
@@ -859,12 +959,34 @@ def checkout(payload: CheckoutPayload):
             "id": order_id,
             "order_number": order_number(order_id),
             "subtotal": subtotal,
-            "delivery_fee": DELIVERY_FEE,
+            "delivery_fee": payable_delivery_fee,
+            "coupon_code": coupon_code,
+            "coupon_discount": coupon_discount_amount,
+            "shipping_discount": shipping_discount_amount,
             "total": total,
             "status": "Pending",
             "payment_method": payload.payment_method,
             "payment_status": payment_status,
             "transaction_reference": transaction_reference,
+        }
+
+
+@app.get("/api/coupons/validate")
+def validate_coupon(code: str, subtotal: int = 0):
+    subtotal = max(0, int(subtotal or 0))
+    with db() as conn:
+        coupon = active_coupon_row(conn, code)
+        coupon_discount_amount, shipping_discount_amount = coupon_discount(coupon, subtotal, DELIVERY_FEE)
+        payable_delivery_fee = max(0, DELIVERY_FEE - shipping_discount_amount) if subtotal > 0 else 0
+        return {
+            "code": coupon["code"],
+            "coupon_type": coupon["coupon_type"],
+            "discount_value": coupon["discount_value"],
+            "coupon_discount": coupon_discount_amount,
+            "shipping_discount": shipping_discount_amount if subtotal > 0 else 0,
+            "delivery_fee": payable_delivery_fee,
+            "total": max(0, subtotal - coupon_discount_amount) + payable_delivery_fee,
+            "remaining": max(0, int(coupon["quantity"] or 0) - int(coupon["used_count"] or 0)),
         }
 
 
@@ -1077,6 +1199,66 @@ def delete_product(product_id: int, admin=Depends(require_permission("products:d
         product_row(conn, product_id)
         conn.execute("UPDATE products SET active=0, updated_at=? WHERE id=?", (int(time.time()), product_id))
     return {"message": "Product removed from public catalog."}
+
+
+@app.get("/api/admin/coupons")
+def admin_coupons(admin=Depends(require_permission("coupons:manage"))):
+    with db() as conn:
+        return [serialize_coupon(row) for row in conn.execute("SELECT * FROM coupons ORDER BY updated_at DESC, id DESC").fetchall()]
+
+
+@app.post("/api/admin/coupons")
+def create_coupon(payload: CouponPayload, admin=Depends(require_permission("coupons:manage"))):
+    now = int(time.time())
+    code = validate_coupon_payload(payload)
+    with db() as conn:
+        try:
+            cursor = conn.execute(
+                """
+                INSERT INTO coupons (code,coupon_type,discount_value,quantity,used_count,active,created_at,updated_at)
+                VALUES (?,?,?,?,0,?,?,?)
+                """,
+                (code, payload.coupon_type, payload.discount_value, payload.quantity, int(payload.active), now, now),
+            )
+        except sqlite3.IntegrityError:
+            raise HTTPException(status_code=400, detail="A coupon with this code already exists.")
+        return serialize_coupon(conn.execute("SELECT * FROM coupons WHERE id=?", (cursor.lastrowid,)).fetchone())
+
+
+@app.put("/api/admin/coupons/{coupon_id}")
+def update_coupon(coupon_id: int, payload: CouponPayload, admin=Depends(require_permission("coupons:manage"))):
+    now = int(time.time())
+    code = validate_coupon_payload(payload)
+    with db() as conn:
+        existing = conn.execute("SELECT * FROM coupons WHERE id=?", (coupon_id,)).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="Coupon not found.")
+        if payload.quantity < int(existing["used_count"] or 0):
+            raise HTTPException(status_code=400, detail="Quantity cannot be lower than the number already used.")
+        try:
+            conn.execute(
+                """
+                UPDATE coupons SET code=?,coupon_type=?,discount_value=?,quantity=?,active=?,updated_at=?
+                WHERE id=?
+                """,
+                (code, payload.coupon_type, payload.discount_value, payload.quantity, int(payload.active), now, coupon_id),
+            )
+        except sqlite3.IntegrityError:
+            raise HTTPException(status_code=400, detail="A coupon with this code already exists.")
+        return serialize_coupon(conn.execute("SELECT * FROM coupons WHERE id=?", (coupon_id,)).fetchone())
+
+
+@app.patch("/api/admin/coupons/{coupon_id}/active")
+def update_coupon_active(coupon_id: int, payload: dict, admin=Depends(require_permission("coupons:manage"))):
+    with db() as conn:
+        coupon = conn.execute("SELECT * FROM coupons WHERE id=?", (coupon_id,)).fetchone()
+        if not coupon:
+            raise HTTPException(status_code=404, detail="Coupon not found.")
+        active = bool(payload.get("active"))
+        if active and int(coupon["used_count"] or 0) >= int(coupon["quantity"] or 0):
+            raise HTTPException(status_code=400, detail="Increase quantity before reactivating this used-up coupon.")
+        conn.execute("UPDATE coupons SET active=?, updated_at=? WHERE id=?", (int(active), int(time.time()), coupon_id))
+        return serialize_coupon(conn.execute("SELECT * FROM coupons WHERE id=?", (coupon_id,)).fetchone())
 
 
 @app.get("/api/admin/orders")

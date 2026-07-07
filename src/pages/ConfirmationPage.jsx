@@ -13,6 +13,9 @@ export default function ConfirmationPage({ confirmation, currency, navigate }) {
         {confirmation ? (
           <>
             <p>Your order number is <strong>{confirmation.order_number}</strong>.</p>
+            {confirmation.coupon_code && (
+              <p>Coupon: <strong>{confirmation.coupon_code}</strong> saved {money(Number(confirmation.coupon_discount || 0) + Number(confirmation.shipping_discount || 0), confirmationCurrency)}</p>
+            )}
             <p>Total: <strong>{money(confirmation.total, confirmationCurrency)}</strong></p>
             <p>Payment: <strong>{confirmation.payment_method}</strong> - {confirmation.payment_status}</p>
 

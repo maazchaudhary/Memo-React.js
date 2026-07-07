@@ -1,7 +1,7 @@
 import CartItems from "./CartItems";
 import OrderSummary from "./OrderSummary";
 
-export default function CartDrawer({ open, onClose, cart, totals, currency, navigate, updateSize, removeItem }) {
+export default function CartDrawer({ open, onClose, cart, totals, currency, navigate, updateSize, updateQuantity, removeItem }) {
   function goCheckout() {
     if (!cart.length) return;
     onClose();
@@ -13,7 +13,7 @@ export default function CartDrawer({ open, onClose, cart, totals, currency, navi
       <div className="cart-panel" role="dialog" aria-modal="true" aria-labelledby="cartTitle">
         <button className="cart-close" type="button" aria-label="Close cart" onClick={onClose}>x</button>
         <h2 id="cartTitle">Shopping Bag</h2>
-        <CartItems cart={cart} currency={currency} updateSize={updateSize} removeItem={removeItem} />
+        <CartItems cart={cart} currency={currency} updateSize={updateSize} updateQuantity={updateQuantity} removeItem={removeItem} />
         <OrderSummary cart={cart} totals={totals} currency={currency} compact />
         <button className="checkout-button" type="button" disabled={!cart.length} onClick={goCheckout}>Checkout</button>
       </div>
