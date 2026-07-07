@@ -5,6 +5,7 @@ import { cartKey, currencyKey, deliveryFee, sizeOptions } from "./data/storeConf
 import { readCart, readConfirmation, readCurrency, cartItemKey, addOnsLabel, addOnsTotal, normalizeAddOns } from "./utils/cart";
 import { normalizePath } from "./utils/routing";
 import { assetUrl, findProductBySlug } from "./utils/product";
+import { productPrice } from "./utils/money";
 
 import Header from "./components/Header";
 import Footer from "./components/Footer";
@@ -141,8 +142,10 @@ export default function App() {
 
     const selectedSize = sizeOptions.includes(size) ? size : "M";
     const selectedQuantity = Math.max(1, Math.floor(Number(quantity || 1)));
-    const selectedAddOns = normalizeAddOns(addOns);
+    const allowedAddOns = new Set(normalizeAddOns(product.add_ons));
+    const selectedAddOns = normalizeAddOns(addOns).filter((addOnId) => allowedAddOns.has(addOnId));
     const selectedAddOnsTotal = addOnsTotal(selectedAddOns);
+    const basePrice = productPrice(product);
     const key = cartItemKey(product.id, selectedSize, selectedAddOns);
     const existing = cart.find((item) => (item.key || cartItemKey(item.product_id, item.size, item.add_ons)) === key);
 
@@ -161,8 +164,10 @@ export default function App() {
               quantity: selectedQuantity,
               size: selectedSize,
               title: product.title,
-              base_price: product.price,
-              price: Number(product.price || 0) + selectedAddOnsTotal,
+              base_price: basePrice,
+              original_price: product.price,
+              discount_price: product.discount_price || null,
+              price: basePrice + selectedAddOnsTotal,
               add_ons: selectedAddOns,
               add_ons_total: selectedAddOnsTotal,
               image_url: assetUrl(product.image_url),

@@ -26,6 +26,30 @@ function money(amount) {
   return `PKR ${Number(amount || 0).toLocaleString("en-PK")}`;
 }
 
+function productDiscountPrice(product) {
+  const price = Number(product?.price || 0);
+  const discountPrice = Number(product?.discount_price || 0);
+  return price > 0 && discountPrice > 0 && discountPrice < price ? discountPrice : null;
+}
+
+function productDiscountPercent(product) {
+  const discountPrice = productDiscountPrice(product);
+  const price = Number(product?.price || 0);
+  if (!discountPrice || price <= 0) return null;
+  return Math.max(1, Math.min(99, Math.round(((price - discountPrice) / price) * 100)));
+}
+
+function productPriceHtml(product) {
+  const discountPrice = productDiscountPrice(product);
+  if (!discountPrice) return escapeHtml(money(product.price));
+  return `<span class="old-price">${escapeHtml(money(product.price))}</span><strong>${escapeHtml(money(discountPrice))}</strong>`;
+}
+
+function productDiscountText(product) {
+  const percent = productDiscountPercent(product);
+  return percent ? `${percent}% off` : "None";
+}
+
 function dateText(timestamp) {
   return new Date(Number(timestamp) * 1000).toLocaleString();
 }
@@ -41,6 +65,15 @@ function orderAddOnsText(order) {
   return addOns.length ? [...new Set(addOns)].map(escapeHtml).join("<br>") : "None";
 }
 
+function productAddOns(product) {
+  return Array.isArray(product?.add_ons) ? product.add_ons.map((item) => String(item || "").toLowerCase()) : [];
+}
+
+function productAddOnsText(product) {
+  const labels = productAddOns(product).map((item) => ({ pants: "Pants", dupatta: "Dupatta" }[item])).filter(Boolean);
+  return labels.length ? labels.map(escapeHtml).join(", ") : "None";
+}
+
 function showNotice(message, ok = false) {
   const notice = document.querySelector("#notice");
   if (!notice) return;
@@ -53,6 +86,27 @@ function setProductSaveState(form, isSaving) {
   if (!button) return;
   button.disabled = isSaving;
   button.textContent = isSaving ? "Saving..." : "Save product";
+}
+
+function setDiscountFieldsEnabled(form, enabled) {
+  if (!form?.elements.discount_type || !form?.elements.discount_value) return;
+  form.elements.discount_type.disabled = !enabled;
+  form.elements.discount_value.disabled = !enabled;
+  form.elements.discount_value.required = enabled;
+}
+
+function calculateDiscountPrice(fields) {
+  if (!fields.discount_enabled.checked) return null;
+  const price = Number(fields.price.value);
+  const value = Number(fields.discount_value.value);
+  if (!Number.isFinite(price) || price <= 0) throw new Error("Enter the original price before adding a discount.");
+  if (!Number.isFinite(value) || value <= 0) throw new Error("Enter a discount value greater than zero.");
+  if (fields.discount_type.value === "percent") {
+    if (value >= 100) throw new Error("Discount percentage must be less than 100.");
+    return Math.round(price - (price * value / 100));
+  }
+  if (value >= price) throw new Error("Discounted amount must be lower than the original price.");
+  return Math.round(value);
 }
 
 function setAuthMessage(message, ok = false) {
@@ -135,8 +189,10 @@ function renderProducts() {
     <tr>
       <td><strong>${escapeHtml(product.title)}</strong></td>
       <td>${escapeHtml(label(product.category))}<small>${product.active ? "Visible" : "Hidden"}</small></td>
-      <td>${money(product.price)}</td>
+      <td class="price-cell">${productPriceHtml(product)}</td>
+      <td>${escapeHtml(productDiscountText(product))}</td>
       <td>${Number(product.stock || 0)}</td>
+      <td>${productAddOnsText(product)}</td>
       <td><div class="actions">
         <button data-edit="${Number(product.id)}" ${can("products:update") ? "" : "disabled"}>Edit</button>
         <button class="danger" data-delete="${Number(product.id)}" ${can("products:delete") ? "" : "disabled"}>Delete</button>
@@ -198,6 +254,11 @@ function editProduct(id) {
   fields.id.value = product.id;
   fields.title.value = product.title;
   fields.price.value = product.price;
+  const discountPrice = productDiscountPrice(product);
+  fields.discount_enabled.checked = Boolean(discountPrice);
+  fields.discount_type.value = "amount";
+  fields.discount_value.value = discountPrice || "";
+  setDiscountFieldsEnabled(form, Boolean(discountPrice));
   fields.category.value = product.category;
   fields.stock.value = product.stock;
   fields.description.value = product.description;
@@ -206,6 +267,8 @@ function editProduct(id) {
   fields.featured.checked = Boolean(product.featured);
   fields.active.checked = Boolean(product.active);
   fields.out_of_stock.checked = Boolean(product.out_of_stock);
+  fields.add_on_pants.checked = productAddOns(product).includes("pants");
+  fields.add_on_dupatta.checked = productAddOns(product).includes("dupatta");
   document.querySelector("#productFormTitle").textContent = "Edit Product";
 }
 
@@ -214,16 +277,28 @@ async function saveProduct(event) {
   if (!can("products:create") && !can("products:update")) return;
   const form = event.currentTarget;
   const fields = form.elements;
+  let discountPrice = null;
+  try {
+    discountPrice = calculateDiscountPrice(fields);
+  } catch (error) {
+    showNotice(error.message);
+    return;
+  }
   const payload = {
     title: fields.title.value.trim(),
     price: Number(fields.price.value),
+    discount_price: discountPrice,
     category: fields.category.value,
     stock: Number(fields.stock.value),
     description: fields.description.value.trim(),
     image_url: fields.image_url.value.trim(),
     featured: fields.featured.checked,
     active: fields.active.checked,
-    out_of_stock: fields.out_of_stock.checked
+    out_of_stock: fields.out_of_stock.checked,
+    add_ons: [
+      fields.add_on_pants.checked ? "pants" : "",
+      fields.add_on_dupatta.checked ? "dupatta" : ""
+    ].filter(Boolean)
   };
   const imageInputs = [...form.querySelectorAll("[data-product-image-input]")];
   const imageFiles = imageInputs
@@ -263,6 +338,12 @@ function resetProductForm() {
   form.elements.id.value = "";
   form.elements.active.checked = true;
   form.elements.out_of_stock.checked = false;
+  form.elements.discount_enabled.checked = false;
+  form.elements.discount_type.value = "amount";
+  form.elements.discount_value.value = "";
+  setDiscountFieldsEnabled(form, false);
+  form.elements.add_on_pants.checked = false;
+  form.elements.add_on_dupatta.checked = false;
   clearProductImageSlots(form);
   document.querySelector("#productFormTitle").textContent = "Add Product";
 }
@@ -644,7 +725,9 @@ document.querySelectorAll("[data-sales-period]").forEach((button) => {
 
 document.querySelector("#productForm")?.addEventListener("submit", saveProduct);
 document.querySelector("#resetProductForm")?.addEventListener("click", resetProductForm);
+document.querySelector('#productForm [name="discount_enabled"]')?.addEventListener("change", (event) => setDiscountFieldsEnabled(event.currentTarget.form, event.currentTarget.checked));
 document.querySelector("#userForm")?.addEventListener("submit", createUser);
 
+setDiscountFieldsEnabled(document.querySelector("#productForm"), false);
 bootstrap();
 window.MemoAdminReady = true;

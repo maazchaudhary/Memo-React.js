@@ -62,6 +62,12 @@
             <input type="hidden" name="id">
             <label>Title<input name="title" required minlength="2"></label>
             <label>Price<input name="price" type="number" min="0" required></label>
+            <fieldset class="wide discount-options">
+              <legend>Discount</legend>
+              <label class="check"><input name="discount_enabled" type="checkbox"> Add discount</label>
+              <label>Discount type<select name="discount_type"><option value="amount">Discounted amount</option><option value="percent">Percentage off</option></select></label>
+              <label>Discount value<input name="discount_value" type="number" min="0" placeholder="15000 or 10"></label>
+            </fieldset>
             <label>Category<select name="category"><option value="new-arrivals">New Arrivals</option></select></label>
             <label>Stock<input name="stock" type="number" min="0" required></label>
             <label class="wide">Description<textarea name="description" required minlength="2"></textarea></label>
@@ -78,6 +84,11 @@
             <label class="check"><input name="featured" type="checkbox"> Featured on homepage</label>
             <label class="check"><input name="active" type="checkbox" checked> Publicly visible</label>
             <label class="check"><input name="out_of_stock" type="checkbox"> Manually mark out of stock</label>
+            <fieldset class="wide add-on-options">
+              <legend>Available add-ons</legend>
+              <label class="check"><input name="add_on_pants" type="checkbox" value="pants"> Pants</label>
+              <label class="check"><input name="add_on_dupatta" type="checkbox" value="dupatta"> Dupatta</label>
+            </fieldset>
             <div class="form-actions">
               <button type="submit">Save product</button>
               <button type="button" id="resetProductForm">Clear</button>
@@ -85,7 +96,7 @@
           </form>
           <div class="panel">
             <h2>Products / Articles</h2>
-            <div class="table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Actions</th></tr></thead><tbody id="productsTable"></tbody></table></div>
+            <div class="table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Discount</th><th>Stock</th><th>Add-ons</th><th>Actions</th></tr></thead><tbody id="productsTable"></tbody></table></div>
           </div>
         </div>
       </section>
@@ -138,6 +149,6 @@
     </section>
   </main>
 
-  <script src="admin.js?v=5"></script>
+  <script src="admin.js?v=6"></script>
 </body>
 </html>

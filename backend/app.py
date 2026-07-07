@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import logging
 import os
+import json
 import secrets
 import sqlite3
 import smtplib
@@ -261,12 +262,14 @@ class ProductPayload(BaseModel):
     title: str = Field(min_length=2, max_length=120)
     description: str = Field(min_length=2, max_length=1200)
     price: int = Field(ge=0)
+    discount_price: int | None = Field(default=None, ge=0)
     category: str = Field(min_length=2, max_length=80)
     stock: int = Field(ge=0)
     image_url: str | None = Field(default=None, max_length=500)
     featured: bool = False
     active: bool = True
     out_of_stock: bool = False
+    add_ons: list[str] = Field(default_factory=list, max_length=2)
 
 
 class StockPayload(BaseModel):
@@ -378,6 +381,9 @@ def serialize_product(row: sqlite3.Row | None, conn: sqlite3.Connection | None =
         product["image_url"] = public_asset_url(product["image_url"])
         images = product_images(conn, product["id"], product["image_url"]) if conn else [product["image_url"]]
         product["images"] = images
+        product["add_ons"] = parse_product_add_ons(product.get("add_ons"))
+        product["discount_price"] = active_discount_price(product)
+        product["discount_percent"] = discount_percent(product["price"], product["discount_price"])
     return product
 
 
@@ -403,6 +409,62 @@ def normalize_add_ons(add_ons: list[str] | None):
         if add_on_id not in selected:
             selected.append(add_on_id)
     return selected
+
+
+def parse_product_add_ons(value: str | list[str] | None):
+    if isinstance(value, list):
+        return normalize_add_ons(value)
+    if not value:
+        return []
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        parsed = [item.strip() for item in str(value).split(",")]
+    return normalize_add_ons(parsed if isinstance(parsed, list) else [])
+
+
+def product_add_ons_json(add_ons: list[str] | None):
+    return json.dumps(normalize_add_ons(add_ons))
+
+
+def active_discount_price(product: dict | sqlite3.Row | None):
+    if not product:
+        return None
+    keys = product.keys() if hasattr(product, "keys") else product
+    if "discount_price" not in keys:
+        return None
+    price = int(product["price"] or 0)
+    discount_price = product["discount_price"]
+    if discount_price is None:
+        return None
+    discount_price = int(discount_price or 0)
+    return discount_price if price > 0 and 0 < discount_price < price else None
+
+
+def discount_percent(price: int, discount_price: int | None):
+    price = int(price or 0)
+    if not discount_price or price <= 0:
+        return None
+    return max(1, min(99, round(((price - int(discount_price)) / price) * 100)))
+
+
+def clean_discount_price(price: int, discount_price: int | None):
+    if discount_price is None:
+        return None
+    discount_price = int(discount_price or 0)
+    if discount_price <= 0:
+        return None
+    if discount_price >= price:
+        raise HTTPException(status_code=400, detail="Discounted amount must be lower than the original price.")
+    return discount_price
+
+
+def ensure_product_allows_add_ons(product: sqlite3.Row, selected_add_ons: list[str]):
+    allowed_add_ons = set(parse_product_add_ons(product["add_ons"] if "add_ons" in product.keys() else None))
+    blocked = [add_on for add_on in selected_add_ons if add_on not in allowed_add_ons]
+    if blocked:
+        labels = ", ".join(ADD_ON_OPTIONS[add_on]["label"] for add_on in blocked)
+        raise HTTPException(status_code=400, detail=f"{labels} cannot be added to {product['title']}.")
 
 
 def add_ons_total(add_ons: list[str] | None):
@@ -553,12 +615,14 @@ def init_db():
               summary TEXT NOT NULL DEFAULT '',
               description TEXT NOT NULL,
               price INTEGER NOT NULL CHECK(price >= 0),
+              discount_price INTEGER CHECK(discount_price IS NULL OR discount_price >= 0),
               category TEXT NOT NULL,
               stock INTEGER NOT NULL DEFAULT 0 CHECK(stock >= 0),
               image_url TEXT NOT NULL,
               featured INTEGER NOT NULL DEFAULT 0,
               active INTEGER NOT NULL DEFAULT 1,
               out_of_stock INTEGER NOT NULL DEFAULT 0,
+              add_ons TEXT NOT NULL DEFAULT '[]',
               created_at INTEGER NOT NULL,
               updated_at INTEGER NOT NULL
             );
@@ -623,6 +687,8 @@ def init_db():
         ensure_column(conn, "order_items", "add_ons", "TEXT NOT NULL DEFAULT 'None'")
         ensure_column(conn, "order_items", "add_ons_total", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(conn, "products", "out_of_stock", "INTEGER NOT NULL DEFAULT 0")
+        ensure_column(conn, "products", "add_ons", "TEXT NOT NULL DEFAULT '[]'")
+        ensure_column(conn, "products", "discount_price", "INTEGER")
         ensure_column(conn, "stock_requests", "order_id", "INTEGER REFERENCES orders(id)")
         ensure_column(conn, "stock_requests", "ordered_quantity", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(conn, "stock_requests", "available_quantity", "INTEGER NOT NULL DEFAULT 0")
@@ -640,18 +706,20 @@ def init_db():
 
                 cursor = conn.execute(
                 """
-                INSERT INTO products (slug,title,description,price,category,stock,image_url,featured,active,created_at,updated_at)
-                VALUES (?,?,?,?,?,?,?,?,1,?,?)
+                INSERT INTO products (slug,title,description,price,discount_price,category,stock,image_url,featured,active,add_ons,created_at,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,1,?,?,?)
                 """,
                 (
                     slugify(item["title"]),
                     item["title"],
                     item["description"],
                     item["price"],
+                    clean_discount_price(item["price"], item.get("discount_price")),
                     item["category"],
                     item["stock"],
                     main_image,
                     item["featured"],
+                    product_add_ons_json(item.get("add_ons", [])),
                     now,
                     now,
                 ),
@@ -664,6 +732,9 @@ def init_db():
                         "INSERT INTO product_images (product_id,image_url,sort_order,created_at) VALUES (?,?,?,?)",
                         (product_id, image_url, index, now),
                     )
+
+
+init_db()
 
 
 @app.get("/api/products")
@@ -710,8 +781,9 @@ def checkout(payload: CheckoutPayload):
         for item in payload.items:
             product = products_by_id[item.product_id]
             selected_add_ons = normalize_add_ons(item.add_ons)
+            ensure_product_allows_add_ons(product, selected_add_ons)
             item_add_ons_total = add_ons_total(selected_add_ons)
-            item_price = product["price"] + item_add_ons_total
+            item_price = (active_discount_price(product) or product["price"]) + item_add_ons_total
             line_total = item_price * item.quantity
             subtotal += line_total
             order_items.append((product, item.quantity, item.size, item_price, add_ons_label(selected_add_ons), item_add_ons_total, line_total))
@@ -907,6 +979,7 @@ def admin_products(admin=Depends(require_permission("products:view"))):
 def create_product(payload: ProductPayload, admin=Depends(require_permission("products:create"))):
     now = int(time.time())
     image_url = storage_image_url(payload.image_url)
+    discount_price = clean_discount_price(payload.price, payload.discount_price)
     with db() as conn:
         base = slugify(payload.title)
         slug = base
@@ -916,10 +989,10 @@ def create_product(payload: ProductPayload, admin=Depends(require_permission("pr
             index += 1
         cursor = conn.execute(
             """
-            INSERT INTO products (slug,title,summary,description,price,category,stock,image_url,featured,active,out_of_stock,created_at,updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            INSERT INTO products (slug,title,summary,description,price,discount_price,category,stock,image_url,featured,active,out_of_stock,add_ons,created_at,updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
-            (slug, payload.title.strip(), "", payload.description.strip(), payload.price, payload.category, payload.stock, image_url, int(payload.featured), int(payload.active), int(payload.out_of_stock), now, now),
+            (slug, payload.title.strip(), "", payload.description.strip(), payload.price, discount_price, payload.category, payload.stock, image_url, int(payload.featured), int(payload.active), int(payload.out_of_stock), product_add_ons_json(payload.add_ons), now, now),
         )
         product_id = cursor.lastrowid
         set_product_images(conn, product_id, [image_url])
@@ -929,15 +1002,16 @@ def create_product(payload: ProductPayload, admin=Depends(require_permission("pr
 @app.put("/api/admin/products/{product_id}")
 def update_product(product_id: int, payload: ProductPayload, admin=Depends(require_permission("products:update"))):
     now = int(time.time())
+    discount_price = clean_discount_price(payload.price, payload.discount_price)
     with db() as conn:
         existing = product_row(conn, product_id)
         next_image_url = storage_image_url(payload.image_url)
         conn.execute(
             """
-            UPDATE products SET title=?,summary='',description=?,price=?,category=?,stock=?,image_url=?,featured=?,active=?,out_of_stock=?,updated_at=?
+            UPDATE products SET title=?,summary='',description=?,price=?,discount_price=?,category=?,stock=?,image_url=?,featured=?,active=?,out_of_stock=?,add_ons=?,updated_at=?
             WHERE id=?
             """,
-            (payload.title.strip(), payload.description.strip(), payload.price, payload.category, payload.stock, next_image_url, int(payload.featured), int(payload.active), int(payload.out_of_stock), now, product_id),
+            (payload.title.strip(), payload.description.strip(), payload.price, discount_price, payload.category, payload.stock, next_image_url, int(payload.featured), int(payload.active), int(payload.out_of_stock), product_add_ons_json(payload.add_ons), now, product_id),
         )
         if public_asset_url(existing["image_url"]) != public_asset_url(next_image_url):
             set_product_images(conn, product_id, [next_image_url])

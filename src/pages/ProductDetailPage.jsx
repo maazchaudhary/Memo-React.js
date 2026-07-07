@@ -4,7 +4,7 @@ import { sizeOptions } from "../data/storeConfig";
 import Link from "../components/Link";
 import Icon from "../components/Icon";
 import ProductCard from "../components/ProductCard";
-import { money } from "../utils/money";
+import { discountPercent, discountedPrice, money, productPrice } from "../utils/money";
 import { productGallery } from "../utils/product";
 import { addOnOptions, addOnsTotal, normalizeAddOns } from "../utils/cart";
 
@@ -27,8 +27,12 @@ export default function ProductDetailPage({ product, products, currency, navigat
     .filter((item) => item.id !== product?.id && !item.out_of_stock)
     .sort((a, b) => Number(a.stock || 0) - Number(b.stock || 0))
     .slice(0, 4);
+  const availableAddOns = addOnOptions.filter((option) => normalizeAddOns(product?.add_ons).includes(option.id));
   const selectedAddOnsTotal = addOnsTotal(selectedAddOns);
-  const displayPrice = Number(product?.price || 0) + selectedAddOnsTotal;
+  const salePrice = discountedPrice(product);
+  const percentOff = discountPercent(product);
+  const displayPrice = productPrice(product) + selectedAddOnsTotal;
+  const originalDisplayPrice = Number(product?.price || 0) + selectedAddOnsTotal;
 
   useEffect(() => {
     setImageIndex(0);
@@ -42,6 +46,11 @@ export default function ProductDetailPage({ product, products, currency, navigat
   useEffect(() => {
     setQuantity((current) => Math.min(Math.max(1, current), maxQuantity));
   }, [maxQuantity]);
+
+  useEffect(() => {
+    const allowedAddOns = new Set(availableAddOns.map((option) => option.id));
+    setSelectedAddOns((current) => normalizeAddOns(current).filter((addOnId) => allowedAddOns.has(addOnId)));
+  }, [product?.add_ons]);
 
   useEffect(() => {
     document.body.classList.toggle("modal-open", previewOpen);
@@ -196,7 +205,17 @@ export default function ProductDetailPage({ product, products, currency, navigat
         <div className="product-detail-copy">
           <p className="eyebrow">Memo collection</p>
           <h1>{product.title}</h1>
-          <p className="product-detail-price">{money(displayPrice, currency)}</p>
+          <div className="product-detail-price">
+            {salePrice ? (
+              <>
+                <span className="old-price">{money(originalDisplayPrice, currency)}</span>
+                <strong>{money(displayPrice, currency)}</strong>
+                <span className="discount-badge">{percentOff}% off</span>
+              </>
+            ) : (
+              <strong>{money(displayPrice, currency)}</strong>
+            )}
+          </div>
 
           <div className="size-selector" aria-label="Select size">
             <span>Size</span>
@@ -209,21 +228,23 @@ export default function ProductDetailPage({ product, products, currency, navigat
             </div>
           </div>
 
-          <div className="product-add-ons">
-            <span>You May Also Add</span>
-            <div>
-              {addOnOptions.map((option) => (
-                <label key={option.id}>
-                  <input
-                    type="checkbox"
-                    checked={selectedAddOns.includes(option.id)}
-                    onChange={() => toggleAddOn(option.id)}
-                  />
-                  <span>{option.label} - {money(option.price, currency)}</span>
-                </label>
-              ))}
+          {availableAddOns.length > 0 && (
+            <div className="product-add-ons">
+              <span>You May Also Add</span>
+              <div>
+                {availableAddOns.map((option) => (
+                  <label key={option.id}>
+                    <input
+                      type="checkbox"
+                      checked={selectedAddOns.includes(option.id)}
+                      onChange={() => toggleAddOn(option.id)}
+                    />
+                    <span>{option.label} - {money(option.price, currency)}</span>
+                  </label>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {isManuallyOutOfStock && <small className="stock-note disabled">Out of Stock</small>}
 
