@@ -158,4 +158,35 @@ export const seedProducts = [
     ],
     featured: false
   },
+  {
+    id: 12,
+    title: "Passu",
+    description: "3-piece outfit in Pure French velvet beautifully crafted with hand embellishments with intricate beadwork, fine sequin (sitara) detailing, and stonework across the shirt paird with a medium silk dupatta.",
+    price: 32000,
+    category: "new-arrivals",
+    stock: 0,
+    out_of_stock: true,
+    images: [
+      "/assets/photos/IMG_4156.jpg",
+      "/assets/photos/IMG_4140.jpg",
+      "/assets/photos/IMG_4142.jpg",
+      "/assets/photos/SizeChart/IMG_6466.png",
+    ],
+    featured: false
+  },
+  {
+    id: 13,
+    title: "Fia",
+    description: "3-piece outfit in Pure French velvet beautifully crafted with hand embellishments with intricate beadwork, fine sequin (sitara) detailing, and stonework across the shirt paird with a medium silk dupatta.",
+    price: 32000,
+    category: "new-arrivals",
+    stock: 0,
+    out_of_stock: true,
+    images: [
+      "/assets/photos/IMG_4089.jpg",
+      "/assets/photos/IMG_4085.jpg",
+      "/assets/photos/SizeChart/IMG_6466.png",
+    ],
+    featured: false
+  },
 ];

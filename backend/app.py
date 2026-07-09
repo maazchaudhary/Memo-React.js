@@ -234,6 +234,35 @@ SEED_PRODUCTS = [
         ],
         "featured": 0,
     },
+    {
+        "title": "Passu",
+        "description": "3-piece outfit in Pure French velvet beautifully crafted with hand embellishments with intricate beadwork, fine sequin (sitara) detailing, and stonework across the shirt paird with a medium silk dupatta.",
+        "price": 32000,
+        "category": "new-arrivals",
+        "stock": 0,
+        "out_of_stock": 1,
+        "images": [
+            "assets/photos/IMG_4156.jpg",
+            "assets/photos/IMG_4140.jpg",
+            "assets/photos/IMG_4142.jpg",
+            "assets/photos/SizeChart/IMG_6466.png",
+        ],
+        "featured": 0,
+    },
+    {
+        "title": "Fia",
+        "description": "3-piece outfit in Pure French velvet beautifully crafted with hand embellishments with intricate beadwork, fine sequin (sitara) detailing, and stonework across the shirt paird with a medium silk dupatta.",
+        "price": 32000,
+        "category": "new-arrivals",
+        "stock": 0,
+        "out_of_stock": 1,
+        "images": [
+            "assets/photos/IMG_4089.jpg",
+            "assets/photos/IMG_4085.jpg",
+            "assets/photos/SizeChart/IMG_6466.png",
+        ],
+        "featured": 0,
+    },
 ]
 
 
@@ -789,8 +818,8 @@ def init_db():
 
                 cursor = conn.execute(
                 """
-                INSERT INTO products (slug,title,description,price,discount_price,category,stock,image_url,featured,active,add_ons,created_at,updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,1,?,?,?)
+                INSERT INTO products (slug,title,description,price,discount_price,category,stock,image_url,featured,active,out_of_stock,add_ons,created_at,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,1,?,?,?,?)
                 """,
                 (
                     slugify(item["title"]),
@@ -802,6 +831,7 @@ def init_db():
                     item["stock"],
                     main_image,
                     item["featured"],
+                    int(item.get("out_of_stock", 0)),
                     product_add_ons_json(item.get("add_ons", [])),
                     now,
                     now,
