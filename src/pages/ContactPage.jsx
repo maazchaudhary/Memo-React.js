@@ -25,8 +25,16 @@ export default function ContactPage({ navigate }) {
           <p>Questions about a piece, sizing, availability, or an order? Leave us a note and the studio will reach out.</p>
 
           <div className="contact-details">
-            <span>WhatsApp: +92 319 3746142</span>
-            <span>Email: hello@memobymiraal.com</span>
+            <a
+              href="https://wa.me/923193746142"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              WhatsApp: +92 319 3746142
+            </a>
+            <a href="mailto:hello@memobymiraal.com">
+              Email: hello@memobymiraal.com
+            </a>
           </div>
         </div>
 

@@ -64,7 +64,15 @@ export default function HomePage({ products, currency, navigate }) {
 
       <section className="social" id="social">
         <p className="eyebrow">Seen and loved</p>
-        <h2>@memobymiraal</h2>
+        <h2>
+          <a
+            href="https://www.instagram.com/memobymiraal/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            @memobymiraal
+          </a>
+        </h2>
         <div className="social-track">
           <div className="social-set">
             {socialImages.map((image) => (

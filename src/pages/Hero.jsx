@@ -21,7 +21,7 @@ export default function Hero({ navigate }) {
         <p className="eyebrow">The summer memo {"\u00b7"} 2026</p>
         <h1>Made for your<br /><em>softest moments.</em></h1>
         <p>Easy silhouettes, delicate details, and colours borrowed from the garden.</p>
-        <Link to="/#new" navigate={navigate}>Explore the collection</Link>
+        <Link to="/new-arrivals" navigate={navigate}>Explore the collection</Link>
       </div>
 
       <div className="hero-image" id="heroCarousel" aria-roledescription="carousel" aria-label="Featured Memo looks">

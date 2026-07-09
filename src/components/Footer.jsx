@@ -19,9 +19,21 @@ export default function Footer({ navigate }) {
         <div className="footer-section-content">
           <h3>Memo Customer Service</h3>
           <p>Monday to Friday 10am - 9pm</p>
-          <p>WhatsApp: +92 319 3746142</p>
+          <a
+            href="https://wa.me/923193746142"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            WhatsApp: +92 319 3746142
+          </a>
           <p>Messages only</p>
-          <p>Instagram: memobymiraal</p>
+          <a
+            href="https://www.instagram.com/memobymiraal/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Instagram: memobymiraal
+          </a>
         </div>
       </div>
       <div className={`footer-section${openSections.help ? " open" : ""}`}>
